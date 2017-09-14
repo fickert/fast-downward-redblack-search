@@ -153,8 +153,13 @@ macro(fast_downward_set_configuration_types)
     # Only for multi-config generators (like Visual Studio Projects) that choose
     # the build type at build time.
     if(CMAKE_CONFIGURATION_TYPES)
-        set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile"
+        if(MSVC)
+            set(CMAKE_CONFIGURATION_TYPES "Debug;Release"
             CACHE STRING "Reset the configurations to what we need" FORCE)
+        else()
+            set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile"
+            CACHE STRING "Reset the configurations to what we need" FORCE)
+        endif()
     endif()
 endmacro()
 
