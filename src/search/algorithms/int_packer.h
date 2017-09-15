@@ -19,30 +19,58 @@
 */
 namespace int_packer {
 class IntPacker {
-    class VariableInfo;
-
-    std::vector<VariableInfo> var_infos;
-    int num_bins;
-
-    int pack_one_bin(const std::vector<int> &ranges,
-                     std::vector<std::vector<int>> &bits_to_vars);
-    void pack_bins(const std::vector<int> &ranges);
 public:
-    typedef unsigned int Bin;
+	using Bin = unsigned int;
+
+    IntPacker();
+    virtual ~IntPacker();
 
     /*
-      The constructor takes the range for each variable. The domain of
+      The initialize function takes the range for each variable. The domain of
       variable i is {0, ..., ranges[i] - 1}. Because we are using signed
       ints for the ranges (and genenerally for the values of variables),
       a variable can take up at most 31 bits if int is 32-bit.
     */
-    explicit IntPacker(const std::vector<int> &ranges);
-    ~IntPacker();
+	void initialize(const std::vector<int> &ranges);
 
     int get(const Bin *buffer, int var) const;
     void set(Bin *buffer, int var, int value) const;
 
-    int get_num_bins() const {return num_bins; }
+	int get_num_bins() const {return num_bins; }
+
+protected:
+	static constexpr auto BITS_PER_BIN = static_cast<int>(sizeof(Bin) * 8);
+	static auto get_bit_mask(int from, int to) -> Bin;
+
+	class VariableInfo {
+		int range;
+		int bin_index;
+		int shift;
+		Bin read_mask;
+		Bin clear_mask;
+    public:
+		VariableInfo(int range_, int bin_index_, int shift_);
+		VariableInfo();
+		~VariableInfo();
+
+		int get(const Bin *buffer) const;
+		void set(Bin *buffer, int value) const;
+
+		bool get_bit(const Bin *buffer, int value) const;
+		void set_bit(Bin *buffer, int value) const;
+		void init_zero(Bin *buffer) const;
+    };
+
+    std::vector<VariableInfo> var_infos;
+    int num_bins;
+
+	virtual auto get_bits_for_var(const std::vector<int> &ranges, int var, std::vector<std::vector<int>> &bits_to_vars) -> int;
+	virtual void update_var_info(int variable, const std::vector<int> &ranges, int bin_index, int used_bits, int bits);
+
+    int pack_one_bin(const std::vector<int> &ranges,
+                     std::vector<std::vector<int>> &bits_to_vars);
+    void pack_bins(const std::vector<int> &ranges);
+
 };
 }
 
