@@ -16,12 +16,18 @@ SuccessorGenerator::SuccessorGenerator(const TaskProxy &task_proxy)
 SuccessorGenerator::~SuccessorGenerator() = default;
 
 void SuccessorGenerator::generate_applicable_ops(
-    const State &state, vector<OperatorID> &applicable_ops) const {
-    root->generate_applicable_ops(state, applicable_ops);
+	const State &state, vector<OperatorID> &applicable_ops) const {
+	root->generate_applicable_ops(state, applicable_ops);
 }
 
 void SuccessorGenerator::generate_applicable_ops(
-    const GlobalState &state, vector<OperatorID> &applicable_ops) const {
-    root->generate_applicable_ops(state, applicable_ops);
+	const GlobalState &state, vector<OperatorID> &applicable_ops) const {
+	root->generate_applicable_ops(state, applicable_ops);
 }
+
+void SuccessorGenerator::generate_applicable_ops(
+	const redblack::RBState &state, vector<OperatorID> &applicable_ops) const {
+	root->generate_applicable_ops(state, applicable_ops);
+}
+
 }

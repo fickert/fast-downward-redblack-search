@@ -4,6 +4,8 @@
 #include <memory>
 #include <vector>
 
+#include "../redblack/state.h"
+
 class GlobalState;
 class OperatorID;
 class State;
@@ -29,6 +31,10 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const;
+
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const;
 };
 }
 

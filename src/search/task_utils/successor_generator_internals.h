@@ -2,6 +2,7 @@
 #define TASK_UTILS_SUCCESSOR_GENERATOR_INTERNALS_H
 
 #include "../operator_id.h"
+#include "../redblack/state.h"
 
 #include <memory>
 #include <unordered_map>
@@ -18,6 +19,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const = 0;
+	// red-black
+	virtual void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const = 0;
 };
 
 class GeneratorForkBinary : public GeneratorBase {
@@ -32,6 +36,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 
 class GeneratorForkMulti : public GeneratorBase {
@@ -43,6 +50,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 
 class GeneratorSwitchVector : public GeneratorBase {
@@ -57,6 +67,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 
 class GeneratorSwitchHash : public GeneratorBase {
@@ -71,6 +84,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 
 class GeneratorSwitchSingle : public GeneratorBase {
@@ -86,6 +102,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 
 class GeneratorLeafVector : public GeneratorBase {
@@ -97,6 +116,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 
 class GeneratorLeafSingle : public GeneratorBase {
@@ -108,6 +130,9 @@ public:
     // Transitional method, used until the search is switched to the new task interface.
     virtual void generate_applicable_ops(
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
+	// red-black
+	void generate_applicable_ops(
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
 };
 }
 
