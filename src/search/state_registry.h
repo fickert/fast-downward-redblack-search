@@ -145,6 +145,7 @@ class StateRegistry {
     */
     using StateIDSet = std::unordered_set<StateID, StateIDSemanticHash, StateIDSemanticEqual>;
 
+protected:
     /* TODO: The state registry still doesn't use the task interface completely.
              Fixing this is part of issue509. */
     /* TODO: AbstractTask is an implementation detail that is not supposed to
@@ -154,6 +155,7 @@ class StateRegistry {
     /* TODO: When we switch StateRegistry to the task interface, the next three
              members should come from the task. */
     const int_packer::IntPacker &state_packer;
+
     AxiomEvaluator &axiom_evaluator;
     const std::vector<int> &initial_state_data;
     const int num_variables;
@@ -170,7 +172,7 @@ public:
     StateRegistry(
         const AbstractTask &task, const int_packer::IntPacker &state_packer,
         AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data);
-    ~StateRegistry();
+    virtual ~StateRegistry();
 
     /* TODO: Ideally, this should return a TaskProxy. (See comment above the
              declaration of task.) */

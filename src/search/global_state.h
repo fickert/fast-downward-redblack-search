@@ -14,10 +14,16 @@ class StateRegistry;
 
 using PackedStateBin = int_packer::IntPacker::Bin;
 
+namespace redblack {
+class RBStateRegistry;
+}
+
 // For documentation on classes relevant to storing and working with registered
 // states see the file state_registry.h.
 class GlobalState {
+protected:
     friend class StateRegistry;
+	friend class redblack::RBStateRegistry;
     template<typename Entry>
     friend class PerStateInformation;
 
@@ -40,15 +46,15 @@ class GlobalState {
         return *registry;
     }
 public:
-    ~GlobalState() = default;
+    virtual ~GlobalState() = default;
 
     StateID get_id() const {
         return id;
     }
 
-    int operator[](int var) const;
+    virtual int operator[](int var) const;
 
-    std::vector<int> get_values() const;
+    virtual std::vector<int> get_values() const;
 
     void dump_pddl() const;
     void dump_fdr() const;

@@ -37,7 +37,7 @@ public:
 	auto get_bits_for_var(const std::vector<int> &ranges, int var, std::vector<std::vector<int>> &bits_to_vars) -> int override;
 	void update_var_info(int var, const std::vector<int> &ranges, int bin_index, int used_bits, int bits) override;
 
-	static auto get_bin_size_in_bytes() -> std::size_t { return sizeof(Bin); }
+	auto get_painting() const -> const Painting & { return painting; }
 };
 }
 

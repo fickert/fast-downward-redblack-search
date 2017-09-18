@@ -251,7 +251,8 @@ void read_everything(istream &in) {
 
     cout << "packing state variables..." << flush;
     assert(!g_variable_domain.empty());
-    g_state_packer = new int_packer::IntPacker(g_variable_domain);
+    g_state_packer = new int_packer::IntPacker();
+	g_state_packer->initialize(g_variable_domain);
     cout << "done! [t=" << utils::g_timer << "]" << endl;
 
     int num_vars = g_variable_domain.size();
