@@ -1,63 +1,32 @@
 #ifndef GLOBAL_STATE_H
 #define GLOBAL_STATE_H
 
-#include "state_id.h"
+#include "state_registry_base.h"
 
 #include "algorithms/int_packer.h"
 
-#include <cstddef>
-#include <iostream>
-#include <vector>
 
 class GlobalOperator;
-class StateRegistry;
+template<class StateType, class OperatorType>
+class StateRegistryBase;
 
 using PackedStateBin = int_packer::IntPacker::Bin;
 
-namespace redblack {
-class RBStateRegistry;
-}
-
 // For documentation on classes relevant to storing and working with registered
 // states see the file state_registry.h.
-class GlobalState {
+class GlobalState : public StateBase<StateRegistryBase<GlobalState, GlobalOperator>> {
 protected:
-    friend class StateRegistry;
-	friend class redblack::RBStateRegistry;
-    template<typename Entry>
-    friend class PerStateInformation;
-
-    // Values for vars are maintained in a packed state and accessed on demand.
-    const PackedStateBin *buffer;
-
-    // registry isn't a reference because we want to support operator=
-    const StateRegistry *registry;
-    StateID id;
+    friend class StateRegistryBase<GlobalState, GlobalOperator>;
 
     // Only used by the state registry.
     GlobalState(
-        const PackedStateBin *buffer, const StateRegistry &registry, StateID id);
+        const PackedStateBin *buffer, const StateRegistryBase<GlobalState, GlobalOperator> &registry, StateID id);
 
-    const PackedStateBin *get_packed_buffer() const {
-        return buffer;
-    }
-
-    const StateRegistry &get_registry() const {
-        return *registry;
-    }
 public:
     virtual ~GlobalState() = default;
 
-    StateID get_id() const {
-        return id;
-    }
-
-    virtual int operator[](int var) const;
-
-    virtual std::vector<int> get_values() const;
-
-    void dump_pddl() const;
-    void dump_fdr() const;
+    void dump_pddl() const override;
+    void dump_fdr() const override;
 };
 
 

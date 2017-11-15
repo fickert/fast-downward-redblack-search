@@ -21,7 +21,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const = 0;
 	// red-black
 	virtual void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const = 0;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const = 0;
 };
 
 class GeneratorForkBinary : public GeneratorBase {
@@ -38,7 +38,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 
 class GeneratorForkMulti : public GeneratorBase {
@@ -52,7 +52,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 
 class GeneratorSwitchVector : public GeneratorBase {
@@ -69,7 +69,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 
 class GeneratorSwitchHash : public GeneratorBase {
@@ -86,7 +86,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 
 class GeneratorSwitchSingle : public GeneratorBase {
@@ -104,7 +104,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 
 class GeneratorLeafVector : public GeneratorBase {
@@ -118,7 +118,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 
 class GeneratorLeafSingle : public GeneratorBase {
@@ -132,7 +132,7 @@ public:
         const GlobalState &state, std::vector<OperatorID> &applicable_ops) const override;
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const override;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const override;
 };
 }
 

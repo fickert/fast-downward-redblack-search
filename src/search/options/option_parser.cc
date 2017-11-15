@@ -20,6 +20,11 @@
 #include <utility>
 #include <vector>
 
+namespace redblack {
+class RBOperator;
+class RBState;
+}
+
 using namespace std;
 
 // TODO: Remove this when Synergy is gone.
@@ -62,22 +67,37 @@ static void predefine_heuristic(const string &arg, bool dry_run) {
     OptionParser parser(rhs, dry_run);
     if (definees.size() == 1) {
         // Normal predefinition
-        Predefinitions<Heuristic *>::instance()->predefine(
-            definees[0], parser.start_parsing<Heuristic *>());
+        Predefinitions<Heuristic<GlobalState, GlobalOperator> *>::instance()->predefine(
+            definees[0], parser.start_parsing<Heuristic<GlobalState, GlobalOperator> *>());
     } else if (definees.size() > 1) {
         // Synergy
         if (!dry_run) {
-            vector<Heuristic *> heur = parser.start_parsing<Synergy *>()->heuristics;
+            vector<Heuristic<GlobalState, GlobalOperator> *> heur = parser.start_parsing<Synergy *>()->heuristics;
             for (size_t i = 0; i < definees.size(); ++i) {
-                Predefinitions<Heuristic *>::instance()->predefine(
+                Predefinitions<Heuristic<GlobalState, GlobalOperator> *>::instance()->predefine(
                     definees[i], heur[i]);
             }
         } else {
             for (const string &definee : definees) {
-                Predefinitions<Heuristic *>::instance()->predefine(
+                Predefinitions<Heuristic<GlobalState, GlobalOperator> *>::instance()->predefine(
                     definee, nullptr);
             }
         }
+    } else {
+        parser.error("predefinition has invalid left side");
+    }
+}
+
+static void predefine_rbheuristic(const string &arg, bool dry_run) {
+    size_t split_pos = arg.find("=");
+    string lhs = arg.substr(0, split_pos);
+    vector<string> definees = to_list(lhs);
+    string rhs = arg.substr(split_pos + 1);
+    OptionParser parser(rhs, dry_run);
+    if (definees.size() == 1) {
+        // Normal predefinition
+        Predefinitions<Heuristic<redblack::RBState, redblack::RBOperator> *>::instance()->predefine(
+            definees[0], parser.start_parsing<Heuristic<redblack::RBState, redblack::RBOperator> *>());
     } else {
         parser.error("predefinition has invalid left side");
     }
@@ -144,7 +164,7 @@ void OptionParser::check_bounds<double>(
     _check_bounds(*this, key, value, lower_bound, upper_bound);
 }
 
-shared_ptr<SearchEngine> OptionParser::parse_cmd_line(
+shared_ptr<SearchEngine<GlobalState, GlobalOperator>> OptionParser::parse_cmd_line(
     int argc, const char **argv, bool dry_run, bool is_unit_cost) {
     vector<string> args;
     bool active = true;
@@ -182,9 +202,9 @@ int OptionParser::parse_int_arg(const string &name, const string &value) {
 }
 
 
-shared_ptr<SearchEngine> OptionParser::parse_cmd_line_aux(
+shared_ptr<SearchEngine<GlobalState, GlobalOperator>> OptionParser::parse_cmd_line_aux(
     const vector<string> &args, bool dry_run) {
-    shared_ptr<SearchEngine> engine;
+    shared_ptr<SearchEngine<GlobalState, GlobalOperator>> engine;
     // TODO: Remove code duplication.
     for (size_t i = 0; i < args.size(); ++i) {
         string arg = args[i];
@@ -194,6 +214,11 @@ shared_ptr<SearchEngine> OptionParser::parse_cmd_line_aux(
                 throw ArgError("missing argument after --heuristic");
             ++i;
             predefine_heuristic(args[i], dry_run);
+        } else if (arg == "--rbheuristic") {
+            if (is_last)
+                throw ArgError("missing argument after --rbheuristic");
+            ++i;
+            predefine_rbheuristic(args[i], dry_run);
         } else if (arg == "--landmarks") {
             if (is_last)
                 throw ArgError("missing argument after --landmarks");
@@ -204,7 +229,13 @@ shared_ptr<SearchEngine> OptionParser::parse_cmd_line_aux(
                 throw ArgError("missing argument after --search");
             ++i;
             OptionParser parser(args[i], dry_run);
-            engine = parser.start_parsing<shared_ptr<SearchEngine>>();
+            engine = parser.start_parsing<shared_ptr<SearchEngine<GlobalState, GlobalOperator>>>();
+        } else if (arg == "--rbsearch") {
+            if (is_last)
+                throw ArgError("missing argument after --rbsearch");
+            ++i;
+            OptionParser parser(args[i], dry_run);
+            parser.start_parsing<shared_ptr<SearchEngine<redblack::RBState, redblack::RBOperator>>>();
         } else if (arg == "--help" && dry_run) {
             cout << "Help:" << endl;
             bool txt2tags = false;

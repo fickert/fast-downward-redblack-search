@@ -4,12 +4,15 @@
 #include "evaluation_result.h"
 #include "heuristic_cache.h"
 #include "operator_id.h"
+#include "heuristic.h"
+#include "search_statistics.h"
 
-#include <unordered_map>
+#include <cassert>
 
+
+template<class StateType, class OperatorType>
 class Evaluator;
 class GlobalState;
-class SearchStatistics;
 
 /*
   TODO: Now that we have an explicit EvaluationResult class, it's
@@ -46,8 +49,9 @@ class SearchStatistics;
      new best f value.
 */
 
+template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class EvaluationContext {
-    HeuristicCache cache;
+    HeuristicCache<StateType, OperatorType> cache;
     int g_value;
     bool preferred;
     SearchStatistics *statistics;
@@ -63,14 +67,14 @@ public:
       TODO: Can we reuse caches? Can we move them instead of copying them?
     */
     EvaluationContext(
-        const HeuristicCache &cache, int g_value, bool is_preferred,
+        const HeuristicCache<StateType, OperatorType> &cache, int g_value, bool is_preferred,
         SearchStatistics *statistics, bool calculate_preferred = false);
     /*
       Create new heuristic cache for caching heuristic values. Used for example
       by eager search.
     */
     EvaluationContext(
-        const GlobalState &state, int g_value, bool is_preferred,
+        const StateType &state, int g_value, bool is_preferred,
         SearchStatistics *statistics, bool calculate_preferred = false);
     /*
       Use the following constructor when you don't care about g values,
@@ -85,14 +89,14 @@ public:
             contexts that don't need this information.
     */
     EvaluationContext(
-        const GlobalState &state,
+        const StateType &state,
         SearchStatistics *statistics = nullptr, bool calculate_preferred = false);
 
     ~EvaluationContext() = default;
 
-    const EvaluationResult &get_result(Evaluator *heur);
-    const HeuristicCache &get_cache() const;
-    const GlobalState &get_state() const;
+    const EvaluationResult &get_result(Evaluator<StateType, OperatorType> *heur);
+    const HeuristicCache<StateType, OperatorType> &get_cache() const;
+    const StateType &get_state() const;
     int get_g_value() const;
     bool is_preferred() const;
 
@@ -107,12 +111,97 @@ public:
       treated uniformly, use get_heuristic_value_or_infinity(), which
       returns numeric_limits<int>::max() for infinite estimates.
     */
-    bool is_heuristic_infinite(Evaluator *heur);
-    int get_heuristic_value(Evaluator *heur);
-    int get_heuristic_value_or_infinity(Evaluator *heur);
+    bool is_heuristic_infinite(Evaluator<StateType, OperatorType> *heur);
+    int get_heuristic_value(Evaluator<StateType, OperatorType> *heur);
+    int get_heuristic_value_or_infinity(Evaluator<StateType, OperatorType> *heur);
     const std::vector<OperatorID> &get_preferred_operators(
-        Evaluator *heur);
+        Evaluator<StateType, OperatorType> *heur);
     bool get_calculate_preferred() const;
 };
+
+template<class StateType, class OperatorType>
+EvaluationContext<StateType, OperatorType>::EvaluationContext(const HeuristicCache<StateType, OperatorType> &cache, int g_value, bool is_preferred, SearchStatistics *statistics, bool calculate_preferred)
+	: cache(cache),
+	  g_value(g_value),
+	  preferred(is_preferred),
+	  statistics(statistics),
+	  calculate_preferred(calculate_preferred) {}
+
+template<class StateType, class OperatorType>
+EvaluationContext<StateType, OperatorType>::EvaluationContext(
+    const StateType &state, int g_value, bool is_preferred,
+    SearchStatistics *statistics, bool calculate_preferred)
+    : EvaluationContext(HeuristicCache<StateType, OperatorType>(state), g_value, is_preferred, statistics, calculate_preferred) {}
+
+template<class StateType, class OperatorType>
+EvaluationContext<StateType, OperatorType>::EvaluationContext(
+    const StateType &state,
+    SearchStatistics *statistics, bool calculate_preferred)
+    : EvaluationContext(HeuristicCache<StateType, OperatorType>(state), INVALID, false, statistics, calculate_preferred) {}
+
+template<class StateType, class OperatorType>
+const EvaluationResult &EvaluationContext<StateType, OperatorType>::get_result(Evaluator<StateType, OperatorType> *heur) {
+    EvaluationResult &result = cache[heur];
+    if (result.is_uninitialized()) {
+        result = heur->compute_result(*this);
+        if (statistics && dynamic_cast<const Heuristic<StateType, OperatorType> *>(heur)) {
+            /* Only count evaluations of actual Heuristics, not arbitrary
+               evaluators. */
+            if (result.get_count_evaluation()) {
+                statistics->inc_evaluations();
+            }
+        }
+    }
+    return result;
+}
+
+template<class StateType, class OperatorType>
+const HeuristicCache<StateType, OperatorType> &EvaluationContext<StateType, OperatorType>::get_cache() const {
+    return cache;
+}
+
+template<class StateType, class OperatorType>
+const StateType &EvaluationContext<StateType, OperatorType>::get_state() const {
+    return cache.get_state();
+}
+
+template<class StateType, class OperatorType>
+int EvaluationContext<StateType, OperatorType>::get_g_value() const {
+    assert(g_value != INVALID);
+    return g_value;
+}
+
+template<class StateType, class OperatorType>
+bool EvaluationContext<StateType, OperatorType>::is_preferred() const {
+    assert(g_value != INVALID);
+    return preferred;
+}
+
+template<class StateType, class OperatorType>
+bool EvaluationContext<StateType, OperatorType>::is_heuristic_infinite(Evaluator<StateType, OperatorType> *heur) {
+    return get_result(heur).is_infinite();
+}
+
+template<class StateType, class OperatorType>
+int EvaluationContext<StateType, OperatorType>::get_heuristic_value(Evaluator<StateType, OperatorType> *heur) {
+    int h = get_result(heur).get_h_value();
+    assert(h != EvaluationResult::INFTY);
+    return h;
+}
+
+template<class StateType, class OperatorType>
+int EvaluationContext<StateType, OperatorType>::get_heuristic_value_or_infinity(Evaluator<StateType, OperatorType> *heur) {
+    return get_result(heur).get_h_value();
+}
+
+template<class StateType, class OperatorType>
+const std::vector<OperatorID> &EvaluationContext<StateType, OperatorType>::get_preferred_operators(Evaluator<StateType, OperatorType> *heur) {
+    return get_result(heur).get_preferred_operators();
+}
+
+template<class StateType, class OperatorType>
+bool EvaluationContext<StateType, OperatorType>::get_calculate_preferred() const {
+    return calculate_preferred;
+}
 
 #endif

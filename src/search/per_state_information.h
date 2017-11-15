@@ -1,20 +1,22 @@
 #ifndef PER_STATE_INFORMATION_H
 #define PER_STATE_INFORMATION_H
 
-#include "global_state.h"
-#include "globals.h"
-#include "state_id.h"
-#include "state_registry.h"
-
 #include "algorithms/segmented_vector.h"
 #include "utils/collections.h"
 
 #include <cassert>
 #include <unordered_map>
 
+template<class StateType, class OperatorType>
+class StateRegistryBase;
+class GlobalState;
+class GlobalOperator;
+
+template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class PerStateInformationBase {
-    friend class StateRegistry;
-    virtual void remove_state_registry(StateRegistry *registry) = 0;
+    using StateRegistryType = StateRegistryBase<StateType, OperatorType>;
+    friend class StateRegistryType;
+    virtual void remove_state_registry(StateRegistryType *registry) = 0;
 public:
     PerStateInformationBase() {
     }
@@ -47,14 +49,14 @@ public:
   subscribed objects, which in turn destroy all information stored for states
   in that registry.
 */
-template<class Entry>
-class PerStateInformation : public PerStateInformationBase {
+template<class Entry, class StateType = GlobalState, class OperatorType = GlobalOperator>
+class PerStateInformation : public PerStateInformationBase<StateType, OperatorType> {
     const Entry default_value;
-    typedef std::unordered_map<const StateRegistry *,
+    typedef std::unordered_map<const StateRegistryBase<StateType, OperatorType> *,
                                segmented_vector::SegmentedVector<Entry> * > EntryVectorMap;
     EntryVectorMap entries_by_registry;
 
-    mutable const StateRegistry *cached_registry;
+    mutable const StateRegistryBase<StateType, OperatorType> *cached_registry;
     mutable segmented_vector::SegmentedVector<Entry> *cached_entries;
 
     /*
@@ -63,7 +65,7 @@ class PerStateInformation : public PerStateInformationBase {
       Both the registry and the returned vector are cached to speed up
       consecutive calls with the same registry.
     */
-    segmented_vector::SegmentedVector<Entry> *get_entries(const StateRegistry *registry) {
+    segmented_vector::SegmentedVector<Entry> *get_entries(const StateRegistryBase<StateType, OperatorType> *registry) {
         if (cached_registry != registry) {
             cached_registry = registry;
             typename EntryVectorMap::const_iterator it = entries_by_registry.find(registry);
@@ -85,7 +87,7 @@ class PerStateInformation : public PerStateInformationBase {
       Otherwise, both the registry and the returned vector are cached to speed
       up consecutive calls with the same registry.
     */
-    const segmented_vector::SegmentedVector<Entry> *get_entries(const StateRegistry *registry) const {
+    const segmented_vector::SegmentedVector<Entry> *get_entries(const StateRegistryBase<StateType, OperatorType> *registry) const {
         if (cached_registry != registry) {
             typename EntryVectorMap::const_iterator it = entries_by_registry.find(registry);
             if (it == entries_by_registry.end()) {
@@ -99,9 +101,9 @@ class PerStateInformation : public PerStateInformationBase {
         return cached_entries;
     }
 
-    // No implementation to forbid copies and assignment
-    PerStateInformation(const PerStateInformation<Entry> &);
-    PerStateInformation &operator=(const PerStateInformation<Entry> &);
+    // forbid copies and assignment
+    PerStateInformation(const PerStateInformation<Entry, StateType> &) = delete;
+    PerStateInformation &operator=(const PerStateInformation<Entry, StateType> &) = delete;
 public:
     PerStateInformation()
         : default_value(),
@@ -123,8 +125,8 @@ public:
         }
     }
 
-    Entry &operator[](const GlobalState &state) {
-        const StateRegistry *registry = &state.get_registry();
+    Entry &operator[](const StateType &state) {
+        const auto *registry = &state.get_registry();
         segmented_vector::SegmentedVector<Entry> *entries = get_entries(registry);
         int state_id = state.get_id().value;
         size_t virtual_size = registry->size();
@@ -135,8 +137,8 @@ public:
         return (*cached_entries)[state_id];
     }
 
-    const Entry &operator[](const GlobalState &state) const {
-        const StateRegistry *registry = &state.get_registry();
+    const Entry &operator[](const StateType &state) const {
+        const StateRegistryBase<StateType, OperatorType> *registry = &state.get_registry();
         const segmented_vector::SegmentedVector<Entry> *entries = get_entries(registry);
         if (!entries) {
             return default_value;
@@ -150,7 +152,7 @@ public:
         return (*entries)[state_id];
     }
 
-    void remove_state_registry(StateRegistry *registry) {
+    void remove_state_registry(StateRegistryBase<StateType, OperatorType> *registry) override {
         delete entries_by_registry[registry];
         entries_by_registry.erase(registry);
         if (registry == cached_registry) {

@@ -6,12 +6,12 @@
 
 #include "evaluation_context.h"
 
-class GlobalOperator;
+template<class StateType, class OperatorType>
 class Heuristic;
 class StateID;
 
 
-template<class Entry>
+template<class Entry, class StateType = GlobalState, class OperatorType = GlobalOperator>
 class OpenList {
     bool only_preferred;
 
@@ -23,7 +23,7 @@ protected:
       to be inserted is not preferred. Hence, these conditions need
       not be checked by the implementation.
     */
-    virtual void do_insertion(EvaluationContext &eval_context,
+    virtual void do_insertion(EvaluationContext<StateType, OperatorType> &eval_context,
                               const Entry &entry) = 0;
 
 public:
@@ -47,7 +47,7 @@ public:
       do_insertion performing the bulk of the work. See comments for
       do_insertion.
     */
-    void insert(EvaluationContext &eval_context, const Entry &entry);
+    void insert(EvaluationContext<StateType, OperatorType> &eval_context, const Entry &entry);
 
     /*
       Remove and return the entry that should be expanded next.
@@ -95,7 +95,7 @@ public:
 
       TODO: This method can probably go away at some point.
     */
-    virtual void get_involved_heuristics(std::set<Heuristic *> &hset) = 0;
+    virtual void get_involved_heuristics(std::set<Heuristic<StateType, OperatorType> *> &hset) = 0;
 
     /*
       Accessor method for only_preferred.
@@ -127,39 +127,41 @@ public:
       Like OpenList::insert, the methods usually evaluate heuristic
       values, which are then cached in eval_context as a side effect.
     */
-    virtual bool is_dead_end(EvaluationContext &eval_context) const = 0;
+    virtual bool is_dead_end(EvaluationContext<StateType, OperatorType> &eval_context) const = 0;
     virtual bool is_reliable_dead_end(
-        EvaluationContext &eval_context) const = 0;
+        EvaluationContext<StateType, OperatorType> &eval_context) const = 0;
 };
 
 
 using StateOpenListEntry = StateID;
 using EdgeOpenListEntry = std::pair<StateID, int>;
 
-using StateOpenList = OpenList<StateOpenListEntry>;
-using EdgeOpenList = OpenList<EdgeOpenListEntry>;
+template<class StateType, class OperatorType>
+using StateOpenList = OpenList<StateOpenListEntry, StateType, OperatorType>;
+template<class StateType, class OperatorType>
+using EdgeOpenList = OpenList<EdgeOpenListEntry, StateType, OperatorType>;
 
 
-template<class Entry>
-OpenList<Entry>::OpenList(bool only_preferred)
+template<class Entry, class StateType, class OperatorType>
+OpenList<Entry, StateType, OperatorType>::OpenList(bool only_preferred)
     : only_preferred(only_preferred) {
 }
 
-template<class Entry>
-void OpenList<Entry>::boost_preferred() {
+template<class Entry, class StateType, class OperatorType>
+void OpenList<Entry, StateType, OperatorType>::boost_preferred() {
 }
 
-template<class Entry>
-void OpenList<Entry>::insert(
-    EvaluationContext &eval_context, const Entry &entry) {
+template<class Entry, class StateType, class OperatorType>
+void OpenList<Entry, StateType, OperatorType>::insert(
+    EvaluationContext<StateType, OperatorType> &eval_context, const Entry &entry) {
     if (only_preferred && !eval_context.is_preferred())
         return;
     if (!is_dead_end(eval_context))
         do_insertion(eval_context, entry);
 }
 
-template<class Entry>
-bool OpenList<Entry>::only_contains_preferred_entries() const {
+template<class Entry, class StateType, class OperatorType>
+bool OpenList<Entry, StateType, OperatorType>::only_contains_preferred_entries() const {
     return only_preferred;
 }
 

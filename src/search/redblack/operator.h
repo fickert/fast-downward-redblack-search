@@ -22,30 +22,34 @@ public:
 	auto is_applicable(const RBState &state) const -> bool;
 
 	auto is_black() const -> bool {
-		return black_effects.empty();
+		return !black_effects.empty();
 	}
 
 	auto get_base_operator() const -> const GlobalOperator & {
 		return base_operator;
 	}
 
+	auto get_cost() const -> int {
+		return base_operator.get_cost();
+	}
+
 	auto get_id() const -> OperatorID {
 		return OperatorID(get_op_index_hacked(&base_operator));
 	}
 
-	auto get_black_preconditions() const -> std::vector<const GlobalCondition *> {
+	auto get_black_preconditions() const -> const std::vector<const GlobalCondition *> & {
 		return black_preconditions;
 	}
 
-	auto get_red_preconditions() const -> std::vector<const GlobalCondition *> {
+	auto get_red_preconditions() const -> const std::vector<const GlobalCondition *> & {
 		return red_preconditions;
 	}
 
-	auto get_black_effects() const -> std::vector<const GlobalEffect *> {
+	auto get_black_effects() const -> const std::vector<const GlobalEffect *> & {
 		return black_effects;
 	}
 
-	auto get_red_effects() const -> std::vector<const GlobalEffect *> {
+	auto get_red_effects() const -> const std::vector<const GlobalEffect *> & {
 		return red_effects;
 	}
 

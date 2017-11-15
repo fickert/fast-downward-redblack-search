@@ -5,7 +5,9 @@
 
 #include <sstream>
 
+template<class StateType, class OperatorType>
 class Evaluator;
+template<class StateType, class OperatorType>
 class Heuristic;
 
 namespace options {
@@ -151,14 +153,14 @@ static std::shared_ptr<T> lookup_in_predefinitions_shared(OptionParser &parser, 
   For now, we use C-style casts since C++-style casts need complete types.
 */
 template<>
-inline Evaluator *TokenParser<Evaluator *>::parse(OptionParser &parser) {
+inline Evaluator<GlobalState, GlobalOperator> *TokenParser<Evaluator<GlobalState, GlobalOperator> *>::parse(OptionParser &parser) {
     const std::string &value = parser.get_root_value();
-    if (Predefinitions<Heuristic *>::instance()->contains(value)) {
-        return (Evaluator *)Predefinitions<Heuristic *>::instance()->get(value);
-    } else if (Registry<Evaluator *>::instance()->contains(value)) {
-        return Registry<Evaluator *>::instance()->get(value)(parser);
-    } else if (Registry<Heuristic *>::instance()->contains(value)) {
-        return (Evaluator *)Registry<Heuristic *>::instance()->get(value)(parser);
+    if (Predefinitions<Heuristic<GlobalState, GlobalOperator> *>::instance()->contains(value)) {
+        return (Evaluator<GlobalState, GlobalOperator> *)Predefinitions<Heuristic<GlobalState, GlobalOperator> *>::instance()->get(value);
+    } else if (Registry<Evaluator<GlobalState, GlobalOperator> *>::instance()->contains(value)) {
+        return Registry<Evaluator<GlobalState, GlobalOperator> *>::instance()->get(value)(parser);
+    } else if (Registry<Heuristic<GlobalState, GlobalOperator> *>::instance()->contains(value)) {
+        return (Evaluator<GlobalState, GlobalOperator> *)Registry<Heuristic<GlobalState, GlobalOperator> *>::instance()->get(value)(parser);
     }
     parser.error("Evaluator " + value + " not found");
     return nullptr;

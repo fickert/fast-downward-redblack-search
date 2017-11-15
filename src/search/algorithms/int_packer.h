@@ -64,6 +64,7 @@ protected:
     std::vector<VariableInfo> var_infos;
     int num_bins;
 
+	virtual auto get_available_bits(int used_bits, std::vector<std::vector<int>> &bits_to_vars) -> int;
 	virtual auto get_bits_for_var(const std::vector<int> &ranges, int var, std::vector<std::vector<int>> &bits_to_vars) -> int;
 	virtual void update_var_info(int variable, const std::vector<int> &ranges, int bin_index, int used_bits, int bits);
 

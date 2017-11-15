@@ -34,6 +34,7 @@ public:
 	void set_bit(Bin *buffer, int var, int value) const;
 	void init_zero(Bin *buffer, int var) const;
 
+	auto get_available_bits(int used_bits, std::vector<std::vector<int>> &bits_to_vars) -> int override;
 	auto get_bits_for_var(const std::vector<int> &ranges, int var, std::vector<std::vector<int>> &bits_to_vars) -> int override;
 	void update_var_info(int var, const std::vector<int> &ranges, int bin_index, int used_bits, int bits) override;
 

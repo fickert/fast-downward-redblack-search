@@ -74,6 +74,7 @@ fast_downward_plugin(
         search_statistics
         state_id
         state_registry
+        state_registry_base
         task_proxy
 
     DEPENDS CAUSAL_GRAPH INT_PACKER ORDERED_SET SEGMENTED_VECTOR SUCCESSOR_GENERATOR TASK_PROPERTIES
@@ -709,6 +710,27 @@ fast_downward_plugin(
     NAME BOOST
     HELP "Boost dependency plugin"
     DEPENDENCY_ONLY
+)
+
+fast_downward_plugin(
+    NAME REDBLACK
+    HELP "Red-black state space search"
+    SOURCES
+        redblack/incremental_painting_strategy
+        redblack/incremental_red_black_search
+        redblack/int_packer
+        redblack/operator
+        redblack/painting
+        redblack/painting_utils
+        redblack/plugins
+        redblack/rb_ff_heuristic
+        redblack/rb_lazy_search
+        redblack/rb_search_engine
+        redblack/search_space
+        redblack/state
+        redblack/state_registry
+        redblack/util
+    DEPENDS BOOST SCCS LAZY_SEARCH FF_HEURISTIC
 )
 
 fast_downward_add_plugin_sources(PLANNER_SOURCES)

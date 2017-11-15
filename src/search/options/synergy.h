@@ -3,12 +3,14 @@
 
 #include <vector>
 
+template<class StateType, class OperatorType>
 class Heuristic;
+class GlobalState;
 
 namespace options {
 class Synergy {
 public:
-    std::vector<Heuristic *> heuristics;
+    std::vector<Heuristic<GlobalState, GlobalOperator> *> heuristics;
 };
 }
 

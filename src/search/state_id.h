@@ -1,7 +1,7 @@
 #ifndef STATE_ID_H
 #define STATE_ID_H
 
-#include <iostream>
+#include <ostream>
 
 // For documentation on classes relevant to storing and working with registered
 // states see the file state_registry.h.
@@ -11,10 +11,12 @@ class RBStateRegistry;
 }
 
 class StateID {
-    friend class StateRegistry;
+	template<class StateType, class OperatorType>
+    friend class StateRegistryBase;
+	friend class StateRegistry;
 	friend class redblack::RBStateRegistry;
     friend std::ostream &operator<<(std::ostream &os, StateID id);
-    template<typename>
+    template<class Entry, class StateType, class OperatorType>
     friend class PerStateInformation;
 
     int value;

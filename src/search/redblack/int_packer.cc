@@ -48,6 +48,10 @@ void RBIntPacker::init_zero(Bin *buffer, int var) const {
 	}
 }
 
+auto RBIntPacker::get_available_bits(int used_bits, std::vector<std::vector<int>> &bits_to_vars) -> int {
+	return used_bits == 0 ? bits_to_vars.size() - 1 : std::max(BITS_PER_BIN - used_bits, 0);
+}
+
 auto RBIntPacker::get_bits_for_var(const std::vector<int> &ranges, int var, std::vector<std::vector<int>> &bits_to_vars) -> int {
 	if (!painting.is_red_var(var))
 		return IntPacker::get_bits_for_var(ranges, var, bits_to_vars);
@@ -77,8 +81,7 @@ void RBIntPacker::update_var_info(int var, const std::vector<int> &ranges, int b
 				var_to_bin[var] = g_variable_domain.size() + num_additional_bins;
 			}
 			stored_bits += std::min(BITS_PER_BIN, bits - stored_bits);
-		}
-		else {
+		} else {
 			++num_bins;
 			++num_additional_bins;
 

@@ -3,7 +3,6 @@
 
 #include "operator_id.h"
 
-#include <limits>
 #include <vector>
 
 class EvaluationResult {

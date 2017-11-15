@@ -5,6 +5,7 @@
 #include "../globals.h"
 
 #include <cassert>
+#include "../redblack/operator.h"
 
 using namespace std;
 
@@ -70,6 +71,16 @@ using namespace std;
 */
 
 namespace successor_generator {
+
+auto operator_affects_black_variable(const redblack::RBState &state, OperatorID op_id) -> bool {
+	const auto &op = state.get_rb_state_registry().get_operators()[op_id.get_index()];
+	return std::any_of(std::begin(op.get_black_effects()), std::end(op.get_black_effects()), [&state](const auto effect) {
+		return std::all_of(std::begin(effect->conditions), std::end(effect->conditions), [&state](const auto &precondition) {
+			return state.has_fact(precondition.var, precondition.val);
+		}) && !state.has_fact(effect->var, effect->val);
+	});
+}
+
 GeneratorForkBinary::GeneratorForkBinary(
     unique_ptr<GeneratorBase> generator1,
     unique_ptr<GeneratorBase> generator2)
@@ -95,9 +106,9 @@ void GeneratorForkBinary::generate_applicable_ops(
 }
 
 void GeneratorForkBinary::generate_applicable_ops(
-	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const {
-	generator1->generate_applicable_ops(state, applicable_ops);
-	generator2->generate_applicable_ops(state, applicable_ops);
+	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only) const {
+	generator1->generate_applicable_ops(state, applicable_ops, black_only);
+	generator2->generate_applicable_ops(state, applicable_ops, black_only);
 }
 
 GeneratorForkMulti::GeneratorForkMulti(vector<unique_ptr<GeneratorBase>> children)
@@ -122,9 +133,9 @@ void GeneratorForkMulti::generate_applicable_ops(
 }
 
 void GeneratorForkMulti::generate_applicable_ops(
-	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const {
+	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only) const {
 	for (const auto &generator : children)
-		generator->generate_applicable_ops(state, applicable_ops);
+		generator->generate_applicable_ops(state, applicable_ops, black_only);
 }
 
 GeneratorSwitchVector::GeneratorSwitchVector(
@@ -152,11 +163,11 @@ void GeneratorSwitchVector::generate_applicable_ops(
 }
 
 void GeneratorSwitchVector::generate_applicable_ops(
-	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const {
-	auto recursion = [&state, &applicable_ops, this](int val) {
+	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only) const {
+	auto recursion = [&state, &applicable_ops, black_only, this](int val) {
 		const auto &generator_for_val = generator_for_value[val];
 		if (generator_for_val)
-			generator_for_val->generate_applicable_ops(state, applicable_ops);
+			generator_for_val->generate_applicable_ops(state, applicable_ops, black_only);
 	};
 	if (state.get_painting().is_black_var(switch_var_id)) {
 		recursion(state[switch_var_id]);
@@ -197,12 +208,12 @@ void GeneratorSwitchHash::generate_applicable_ops(
 }
 
 void GeneratorSwitchHash::generate_applicable_ops(
-	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const {
-	auto recursion = [&state, &applicable_ops, this](int val) {
+	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only) const {
+	auto recursion = [&state, &applicable_ops, black_only, this](int val) {
 		const auto &child = generator_for_value.find(val);
 		if (child != generator_for_value.end()) {
 			const auto &generator_for_val = child->second;
-			generator_for_val->generate_applicable_ops(state, applicable_ops);
+			generator_for_val->generate_applicable_ops(state, applicable_ops, black_only);
 		}
 	};
 	if (state.get_painting().is_black_var(switch_var_id)) {
@@ -238,9 +249,9 @@ void GeneratorSwitchSingle::generate_applicable_ops(
 }
 
 void GeneratorSwitchSingle::generate_applicable_ops(
-	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const {
+	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only) const {
 	if (state.has_fact(switch_var_id, value))
-		generator_for_value->generate_applicable_ops(state, applicable_ops);
+		generator_for_value->generate_applicable_ops(state, applicable_ops, black_only);
 }
 
 GeneratorLeafVector::GeneratorLeafVector(vector<OperatorID> &&applicable_operators)
@@ -270,9 +281,10 @@ void GeneratorLeafVector::generate_applicable_ops(
 }
 
 void GeneratorLeafVector::generate_applicable_ops(
-	const redblack::RBState &, std::vector<OperatorID> &applicable_ops) const {
+	const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only) const {
 	for (OperatorID id : applicable_operators)
-		applicable_ops.push_back(id);
+		if (!black_only || operator_affects_black_variable(state, id))
+			applicable_ops.push_back(id);
 }
 
 GeneratorLeafSingle::GeneratorLeafSingle(OperatorID applicable_operator)
@@ -290,7 +302,8 @@ void GeneratorLeafSingle::generate_applicable_ops(
 }
 
 void GeneratorLeafSingle::generate_applicable_ops(
-	const redblack::RBState &, vector<OperatorID> &applicable_ops) const {
-	applicable_ops.push_back(applicable_operator);
+	const redblack::RBState &state, vector<OperatorID> &applicable_ops, bool black_only) const {
+	if (!black_only || operator_affects_black_variable(state, applicable_operator))
+		applicable_ops.push_back(applicable_operator);
 }
 }

@@ -5,9 +5,15 @@
 
 #include <set>
 
+class GlobalState;
+class GlobalOperator;
+template<class StateType, class OperatorType>
 class EvaluationContext;
+
+template<class StateType, class OperatorType>
 class Heuristic;
 
+template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class Evaluator {
 public:
     Evaluator() = default;
@@ -19,7 +25,7 @@ public:
 
       The default implementation returns true.
     */
-    virtual bool dead_ends_are_reliable() const;
+    virtual bool dead_ends_are_reliable() const { return true; }
 
     /*
       get_involved_heuristics should insert all heuristics that this
@@ -32,7 +38,7 @@ public:
       (There is also one "illegitimate" use, the remaining reference
       to heuristics[0] in EagerSearch.)
     */
-    virtual void get_involved_heuristics(std::set<Heuristic *> &hset) = 0;
+    virtual void get_involved_heuristics(std::set<Heuristic<StateType, OperatorType> *> &hset) = 0;
 
     /*
       compute_result should compute the estimate and possibly
@@ -55,7 +61,7 @@ public:
       this.
     */
     virtual EvaluationResult compute_result(
-        EvaluationContext &eval_context) = 0;
+        EvaluationContext<StateType, OperatorType> &eval_context) = 0;
 };
 
 #endif

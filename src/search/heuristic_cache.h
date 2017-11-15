@@ -7,31 +7,33 @@
 
 #include <unordered_map>
 
+template<class StateType, class OperatorType>
 class Evaluator;
-
-using EvaluationResults = std::unordered_map<Evaluator *, EvaluationResult>;
 
 /*
   Store a state and evaluation results for this state.
 */
+template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class HeuristicCache {
+	using EvaluationResults = std::unordered_map<Evaluator<StateType, OperatorType> *, EvaluationResult>;
+
     EvaluationResults eval_results;
-    GlobalState state;
+    StateType state;
 
 public:
-    explicit HeuristicCache(const GlobalState &state);
+    explicit HeuristicCache(const StateType &state);
     ~HeuristicCache() = default;
 
-    EvaluationResult &operator[](Evaluator *heur);
+    EvaluationResult &operator[](Evaluator<StateType, OperatorType> *heur);
 
-    const GlobalState &get_state() const;
+    const StateType &get_state() const;
 
     template<class Callback>
     void for_each_heuristic_value(const Callback &callback) const {
         for (const auto &element : eval_results) {
-            const Evaluator *eval = element.first;
+            const Evaluator<StateType, OperatorType> *eval = element.first;
             const EvaluationResult &result = element.second;
-            const Heuristic *heuristic = dynamic_cast<const Heuristic *>(eval);
+            const Heuristic<StateType, OperatorType> *heuristic = dynamic_cast<const Heuristic<StateType, OperatorType> *>(eval);
             if (heuristic) {
                 /* We want to consider only Heuristic instances, not other
                    Evaluator instances. */
@@ -40,5 +42,22 @@ public:
         }
     }
 };
+
+
+template<class StateType, class OperatorType>
+HeuristicCache<StateType, OperatorType>::HeuristicCache(const StateType &state)
+    : state(state) {
+}
+
+template<class StateType, class OperatorType>
+EvaluationResult &HeuristicCache<StateType, OperatorType>::operator[](Evaluator<StateType, OperatorType> *heur) {
+    return eval_results[heur];
+}
+
+template<class StateType, class OperatorType>
+const StateType &HeuristicCache<StateType, OperatorType>::get_state() const {
+    return state;
+}
+
 
 #endif

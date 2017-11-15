@@ -10,7 +10,7 @@
 namespace redblack {
 namespace rbutils {
 
-auto get_sccs(std::vector<int> variables) -> std::vector<std::set<int>> {
+inline auto get_sccs(std::vector<int> variables) -> std::vector<std::set<int>> {
 	std::vector<std::vector<int>> vars(g_root_task()->get_num_variables());
 	std::size_t bound = variables.empty() ? g_root_task()->get_num_variables() : variables.size();
 	const auto &causal_graph = causal_graph::get_causal_graph(g_root_task().get());
@@ -49,7 +49,7 @@ auto get_sccs(std::vector<int> variables) -> std::vector<std::set<int>> {
 	return real_sccs;
 }
 
-auto get_scc_levels(std::vector<std::set<int>> sccs) -> std::vector<std::vector<std::set<int>>> {
+inline auto get_scc_levels(std::vector<std::set<int>> sccs) -> std::vector<std::vector<std::set<int>>> {
 	// determine topology
 	std::vector<std::vector<std::set<int>>> sccs_per_level(1);
 

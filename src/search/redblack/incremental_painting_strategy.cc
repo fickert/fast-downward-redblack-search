@@ -1,12 +1,12 @@
 #include "incremental_painting_strategy.h"
 
 #include "painting_utils.h"
-#include "../abstract_task.h"
 #include "../global_operator.h"
 #include "../globals.h"
 #include "../options/options.h"
 #include "../options/option_parser.h"
 #include "../options/plugin.h"
+#include "../utils/rng_options.h"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -21,6 +21,10 @@ IncrementalPaintingStrategy::IncrementalPaintingStrategy(const options::Options 
 
 IncrementalPaintingStrategy::~IncrementalPaintingStrategy() {}
 
+
+auto get_num_black(int num_black, double percentage) -> int {
+	return num_black < 1 ? percentage * g_root_task()->get_num_variables() : num_black;
+}
 
 auto LeastConflictsPaintingStrategy::get_variable_levels() -> std::vector<int> {
 	auto scc_levels = rbutils::get_scc_levels(rbutils::get_sccs({}));
@@ -38,7 +42,8 @@ auto LeastConflictsPaintingStrategy::get_variable_levels() -> std::vector<int> {
 
 LeastConflictsPaintingStrategy::LeastConflictsPaintingStrategy(const options::Options &opts)
 	: IncrementalPaintingStrategy(opts),
-	  prefer_lvl(opts.get<bool>("prefer_lvl")) {}
+	  prefer_lvl(opts.get<bool>("prefer_lvl")),
+	  num_black(get_num_black(opts.get<int>("num_black"), opts.get<double>("black_percentage"))) {}
 
 auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting {
 	auto conflicts = std::vector<int>(g_root_task()->get_num_variables(), 0);
@@ -49,7 +54,10 @@ auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last
 			if (current_state[pre.var] != pre.val)
 				++conflicts[pre.var];
 		for (const auto &eff : op.get_effects())
-			current_state[eff.var] = eff.val;
+			if (std::all_of(std::begin(eff.conditions), std::end(eff.conditions), [&current_state](const auto &condition) {
+				return current_state[condition.var] == condition.val;
+			}))
+				current_state[eff.var] = eff.val;
 	}
 	for (const auto &goal : g_goal)
 		if (current_state[goal.first] != goal.second)
@@ -64,39 +72,40 @@ auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last
 	}
 
 	auto painting = last_painting.get_painting();
-	auto num_black = std::count_if(std::begin(painting), std::end(painting), [](auto b) { return !b; });
+	auto current_num_black = static_cast<std::size_t>(std::count_if(std::begin(painting), std::end(painting), [](auto b) { return !b; }));
 	int curr_lvl = 0;
-	while (num_black < num_black_vars) {
+	auto do_prefer_lvl = prefer_lvl;
+	const auto target_num_black = std::min<std::size_t>(current_num_black + num_black, g_root_task()->get_num_variables());
+	while (current_num_black < target_num_black) {
 		// ignoring the force_cg_leaves_red flag here, since CG leaves should
 		// never have a conflict.
 		int max = -1;
 		int i = -1;
 		for (size_t var = 0; var < g_variable_domain.size(); ++var) {
-			if (conflicts[var] > max && painting[var] && (!prefer_lvl || (level[var] == curr_lvl && conflicts[var] > 0))) {
+			if (conflicts[var] > max && painting[var] && (!do_prefer_lvl || (level[var] == curr_lvl && conflicts[var] > 0))) {
 				max = conflicts[var];
 				i = var;
 			}
 		}
-		if (prefer_lvl && i == -1) {
+		if (do_prefer_lvl && i == -1) {
 			++curr_lvl;
 			if (curr_lvl >= max_level) {
-				// TODO: this was copy/pasted from prior code, where this was only run once. introduce a local variable for prefer_lvl
-				prefer_lvl = false;
+				do_prefer_lvl = false;
 			}
 			continue;
 		}
 		assert(painting[i]);
 		painting[i] = false;
-		++num_black;
+		++current_num_black;
 	}
 
 	return painting;
 }
 
 static auto _parse_least_conflicts(options::OptionParser &parser) -> std::shared_ptr<IncrementalPaintingStrategy> {
-	//IncrementalPaintingStrategy::add_options_to_parser(parser);
+	parser.add_option<int>("num_black", "number of additional variables to be painted black", "1", options::Bounds("0", "infinity"));
+	parser.add_option<double>("black_percentage", "percentage of variables to be painted black", "0", options::Bounds("0", "infinity"));
 
-	//parser.add_option<int>("number_black_vars", "TODO", "0");
 	parser.add_option<bool>("prefer_lvl", "TODO", "false");
 
 	if (parser.help_mode() || parser.dry_run())
@@ -104,12 +113,41 @@ static auto _parse_least_conflicts(options::OptionParser &parser) -> std::shared
 	return std::make_shared<LeastConflictsPaintingStrategy>(parser.parse());
 }
 
-// TODO: strategies
+
+RandomPaintingStrategy::RandomPaintingStrategy(const options::Options &opts)
+	: IncrementalPaintingStrategy(opts),
+	  num_black(get_num_black(opts.get<int>("num_black"), opts.get<double>("black_percentage"))),
+	  rng(utils::parse_rng_from_options(opts)) {}
+
+auto RandomPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &) -> Painting {
+	auto red_variables = std::vector<std::size_t>();
+	red_variables.reserve(g_root_task()->get_num_variables());
+	for (auto i = 0; i < g_root_task()->get_num_variables(); ++i)
+		if (last_painting.is_red_var(i))
+			red_variables.push_back(i);
+	rng->shuffle(red_variables);
+	auto next_painting = last_painting.get_painting();
+	for (auto i = 0u; i < std::min<std::size_t>(red_variables.size(), num_black); ++i)
+		next_painting[i] = false;
+	return Painting(next_painting);
+}
+
+static auto _parse_random(options::OptionParser &parser) -> std::shared_ptr<IncrementalPaintingStrategy> {
+	parser.add_option<int>("num_black", "number of additional variables to be painted black", "1", options::Bounds("0", "infinity"));
+	parser.add_option<double>("black_percentage", "percentage of variables to be painted black", "0", options::Bounds("0", "infinity"));
+
+	utils::add_rng_options(parser);
+
+	if (parser.help_mode() || parser.dry_run())
+		return nullptr;
+	return std::make_shared<RandomPaintingStrategy>(parser.parse());
+}
 
 
 // strategy plugins
 
-static options::PluginShared<IncrementalPaintingStrategy> _plugin_dynamic_balancing_time("least_conflicts", _parse_least_conflicts);
+static options::PluginShared<IncrementalPaintingStrategy> _plugin_least_conflicts("least_conflicts", _parse_least_conflicts);
+static options::PluginShared<IncrementalPaintingStrategy> _plugin_random("random", _parse_random);
 
 static options::PluginTypePlugin<IncrementalPaintingStrategy> _type_plugin("Incremental Painting Strategy",
 	"Strategies to incrementally update the red-black painting.");

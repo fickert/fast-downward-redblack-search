@@ -4,12 +4,14 @@
 #include <memory>
 #include <vector>
 
-#include "../redblack/state.h"
-
 class GlobalState;
 class OperatorID;
 class State;
 class TaskProxy;
+
+namespace redblack {
+class RBState;
+}
 
 namespace successor_generator {
 class GeneratorBase;
@@ -34,7 +36,7 @@ public:
 
 	// red-black
 	void generate_applicable_ops(
-		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops) const;
+		const redblack::RBState &state, std::vector<OperatorID> &applicable_ops, bool black_only = true) const;
 };
 }
 

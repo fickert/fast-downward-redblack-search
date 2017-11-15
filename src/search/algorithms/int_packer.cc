@@ -32,9 +32,14 @@ IntPacker::VariableInfo::VariableInfo(int range_, int bin_index_, int shift_)
 	: range(range_),
 	  bin_index(bin_index_),
 	  shift(shift_) {
-	int bit_size = get_bit_size_for_range(range);
-	read_mask = get_bit_mask(shift, shift + bit_size);
-	clear_mask = ~read_mask;
+	if (static_cast<unsigned int>(range) == pow(2u, BITS_PER_BIN) - 1) {
+		clear_mask = 0;
+		read_mask = ~clear_mask;
+	} else {
+		int bit_size = get_bit_size_for_range(range);
+		read_mask = get_bit_mask(shift, shift + bit_size);
+		clear_mask = ~read_mask;
+	}
 }
 
 IntPacker::VariableInfo::VariableInfo()
@@ -49,7 +54,7 @@ auto IntPacker::VariableInfo::get(const Bin *buffer) const -> int {
 }
 
 void IntPacker::VariableInfo::set(Bin *buffer, int value) const {
-	assert(value >= 0 && value < range);
+	assert(value >= 0 && static_cast<unsigned int>(value) < static_cast<unsigned int>(range));
 	Bin &bin = buffer[bin_index];
 	bin = (bin & clear_mask) | (value << shift);
 }
@@ -59,7 +64,7 @@ bool IntPacker::VariableInfo::get_bit(const Bin *buffer, int value) const {
 }
 
 void IntPacker::VariableInfo::set_bit(Bin *buffer, int value) const {
-	assert(value >= 0 && pow(2, value) < range);
+	assert(value >= 0 && pow(2u, value) < static_cast<unsigned int>(range));
 	Bin &bin = buffer[bin_index];
 	bin = bin | (1 << (shift + value));
 }
@@ -86,6 +91,10 @@ int IntPacker::get(const Bin *buffer, int var) const {
 
 void IntPacker::set(Bin *buffer, int var, int value) const {
     var_infos[var].set(buffer, value);
+}
+
+auto IntPacker::get_available_bits(int used_bits, std::vector<std::vector<int>> &) -> int {
+	return BITS_PER_BIN - used_bits;
 }
 
 auto IntPacker::get_bits_for_var(const vector<int> &ranges, int var, std::vector<std::vector<int>> &) -> int {
@@ -133,7 +142,7 @@ int IntPacker::pack_one_bin(const vector<int> &ranges,
 
     while (true) {
         // Determine size of largest variable that still fits into the bin.
-        int bits = BITS_PER_BIN - used_bits;
+        int bits = get_available_bits(used_bits, bits_to_vars);
         while (bits > 0 && bits_to_vars[bits].empty())
             --bits;
 
@@ -149,9 +158,10 @@ int IntPacker::pack_one_bin(const vector<int> &ranges,
         int var = best_fit_vars.back();
         best_fit_vars.pop_back();
 
-		update_var_info(var, ranges, bin_index, used_bits, bits);
+        update_var_info(var, ranges, bin_index, used_bits, bits);
         used_bits += bits;
         ++num_vars_in_bin;
     }
 }
+
 }

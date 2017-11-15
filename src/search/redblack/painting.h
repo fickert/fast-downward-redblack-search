@@ -1,5 +1,5 @@
-#ifndef PAINTING_H
-#define PAINTING_H
+#ifndef REDBLACK_PAINTING_H
+#define REDBLACK_PAINTING_H
 
 #include "../utils/rng.h"
 
@@ -13,12 +13,6 @@ class Options;
 }
 
 namespace redblack {
-
-// TODO: move the construction of the paintings out of the painting class, either use static functions or a factory
-// a) need a way to generate a painting from scratch
-// b) incremental strategy (this is a separate problem)
-
-// --> two FD plugins: a) painting, b) incrementalpaintingstrategy
 
 using InternalPaintingType = std::vector<bool>;
 
@@ -74,7 +68,7 @@ public:
 
 
 class CGBranchFirstPaintingFactory : public PaintingFactory {
-	const int num_black_vars;
+	int num_black_vars;
 	std::vector<bool> scc_painted;
 	std::vector<int> scc_offset_to_level;
 
