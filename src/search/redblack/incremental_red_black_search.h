@@ -2,6 +2,7 @@
 #define REDBLACK_INCREMENTAL_RED_BLACK_SEARCH_H
 
 #include "painting.h"
+#include "util.h"
 #include "../search_engines/lazy_search.h"
 #include "operator.h"
 
@@ -31,7 +32,7 @@ protected:
 	using InternalRBSearchEngine = lazy_search::LazySearch<RBState, RBOperator>;
 	const options::Options rb_search_engine_options;
 
-	auto is_real_plan(const GlobalState &initial_state, const RBPlan &plan) -> std::tuple<bool, RBPlan::const_iterator, GlobalState>;
+	auto is_real_plan(const GlobalState &initial_state, const RBPlan &plan) -> std::tuple<bool, GlobalState>;
 
 	GlobalState current_initial_state;
 

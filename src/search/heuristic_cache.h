@@ -10,6 +10,9 @@
 template<class StateType, class OperatorType>
 class Evaluator;
 
+template<class StateType, class OperatorType>
+class Heuristic;
+
 /*
   Store a state and evaluation results for this state.
 */

@@ -23,15 +23,15 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 }
 
-auto IncrementalRedBlackSearch::is_real_plan(const GlobalState& initial_state, const RBPlan &plan) -> std::tuple<bool, RBPlan::const_iterator, GlobalState> {
+auto IncrementalRedBlackSearch::is_real_plan(const GlobalState& initial_state, const RBPlan &plan) -> std::tuple<bool, GlobalState> {
 	auto current_state = initial_state;
 	for (auto plan_it = std::begin(plan); plan_it != std::end(plan); ++plan_it) {
 		const auto &op = (**plan_it).get_base_operator();
 		if (!op.is_applicable(current_state))
-			return {false, plan_it, current_state};
+			return {false, current_state};
 		current_state = state_registry->get_successor_state(current_state, op);
 	}
-	return {test_goal(current_state), std::end(plan), current_state};
+	return {test_goal(current_state), current_state};
 }
 
 void IncrementalRedBlackSearch::set_solution(const Plan &partial_plan, const GlobalState &state) {
@@ -81,8 +81,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	if (status == FAILED)
 		utils::exit_with(utils::ExitCode::UNSOLVABLE);
 	assert(status == SOLVED);
-	auto [is_plan, conflict_pos, resulting_state] = is_real_plan(current_initial_state, rb_search_engine->get_plan());
-	(void *) &conflict_pos;
+	auto [is_plan, resulting_state] = is_real_plan(current_initial_state, rb_search_engine->get_plan());
 	if (is_plan) {
 		// TODO: set plan
 		return SOLVED;

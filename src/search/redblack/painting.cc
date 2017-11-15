@@ -405,7 +405,7 @@ auto IncSCCLvlPaintingFactory::construct_painting() -> InternalPaintingType {
 		for (const auto &scc : sccs_per_level[curr_lvl])
 			sccs_curr_lvl.push_back(std::vector<int>(scc.begin(), scc.end()));
 
-		for (std::size_t index = 0; index < g_root_task()->get_num_variables(); ++index) {
+		for (std::size_t index = 0; index < static_cast<std::size_t>(g_root_task()->get_num_variables()); ++index) {
 			bool red_left = false;
 
 			for (const auto &scc : sccs_curr_lvl) {

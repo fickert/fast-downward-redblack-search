@@ -78,12 +78,12 @@ LazySearch<StateType, OperatorType>::LazySearch(const options::Options &opts)
       randomize_successors(opts.get<bool>("randomize_successors")),
       preferred_successors_first(opts.get<bool>("preferred_successors_first")),
       rng(utils::parse_rng_from_options(opts)),
-      current_state(state_registry->get_initial_state()),
+      current_state(this->state_registry->get_initial_state()),
       current_predecessor_id(StateID::no_state),
       current_operator(nullptr),
       current_g(0),
       current_real_g(0),
-      current_eval_context(current_state, 0, true, &statistics) {
+      current_eval_context(current_state, 0, true, &this->statistics) {
     /*
       We initialize current_eval_context in such a way that the initial node
       counts as "preferred".
@@ -110,7 +110,7 @@ LazySearch<StateType, OperatorType>::LazySearch(const options::Options &opts,
       current_operator(nullptr),
       current_g(0),
       current_real_g(0),
-      current_eval_context(current_state, 0, true, &statistics) {
+      current_eval_context(current_state, 0, true, &this->statistics) {
     /*
       We initialize current_eval_context in such a way that the initial node
       counts as "preferred".
@@ -119,7 +119,7 @@ LazySearch<StateType, OperatorType>::LazySearch(const options::Options &opts,
 
 template<class StateType, class OperatorType>
 void LazySearch<StateType, OperatorType>::initialize() {
-    std::cout << "Conducting lazy best first search, (real) bound = " << bound << std::endl;
+    std::cout << "Conducting lazy best first search, (real) bound = " << this->bound << std::endl;
 
     assert(open_list);
     std::set<Heuristic<StateType, OperatorType> *> hset;
@@ -132,7 +132,7 @@ void LazySearch<StateType, OperatorType>::initialize() {
 
     heuristics.assign(hset.begin(), hset.end());
     assert(!heuristics.empty());
-    const auto &initial_state = state_registry->get_initial_state();
+    const auto &initial_state = this->state_registry->get_initial_state();
     for (Heuristic<StateType, OperatorType> *heuristic : heuristics) {
         heuristic->notify_initial_state(initial_state);
     }
@@ -175,14 +175,14 @@ void LazySearch<StateType, OperatorType>::generate_successors() {
     std::vector<OperatorID> successor_operators =
         get_successor_operators(preferred_operators);
 
-    statistics.inc_generated(successor_operators.size());
+    this->statistics.inc_generated(successor_operators.size());
 
     for (OperatorID op_id : successor_operators) {
         const auto *op = get_operator(op_id.get_index());
-        int new_g = current_g + get_adjusted_cost(*op);
+        int new_g = current_g + this->get_adjusted_cost(*op);
         int new_real_g = current_real_g + op->get_cost();
         bool is_preferred = preferred_operators.contains(op_id);
-        if (new_real_g < bound) {
+        if (new_real_g < this->bound) {
             EvaluationContext<StateType, OperatorType> new_eval_context(
                 current_eval_context.get_cache(), new_g, is_preferred, nullptr);
             open_list->insert(new_eval_context, std::make_pair(current_state.get_id(), get_op_index_hacked(op)));
@@ -201,12 +201,12 @@ SearchStatus LazySearch<StateType, OperatorType>::fetch_next_state() {
 
     current_predecessor_id = next.first;
     current_operator = get_operator(next.second);
-    StateType current_predecessor = state_registry->lookup_state(current_predecessor_id);
+    StateType current_predecessor = this->state_registry->lookup_state(current_predecessor_id);
     assert(current_operator->is_applicable(current_predecessor));
-    current_state = state_registry->get_successor_state(current_predecessor, *current_operator);
+    current_state = this->state_registry->get_successor_state(current_predecessor, *current_operator);
 
-    SearchNode<StateType, OperatorType> pred_node = search_space.get_node(current_predecessor);
-    current_g = pred_node.get_g() + get_adjusted_cost(*current_operator);
+    SearchNode<StateType, OperatorType> pred_node = this->search_space.get_node(current_predecessor);
+    current_g = pred_node.get_g() + this->get_adjusted_cost(*current_operator);
     current_real_g = pred_node.get_real_g() + current_operator->get_cost();
 
     /*
@@ -217,7 +217,7 @@ SearchStatus LazySearch<StateType, OperatorType>::fetch_next_state() {
       associate with the expanded vs. evaluated nodes in lazy search
       and where to obtain it from.
     */
-    current_eval_context = EvaluationContext<StateType, OperatorType>(current_state, current_g, true, &statistics);
+    current_eval_context = EvaluationContext<StateType, OperatorType>(current_state, current_g, true, &this->statistics);
 
     return IN_PROGRESS;
 }
@@ -232,7 +232,7 @@ SearchStatus LazySearch<StateType, OperatorType>::step() {
     // - current_real_g is the g value of the current state (using real costs)
 
 
-    auto node = search_space.get_node(current_state);
+    auto node = this->search_space.get_node(current_state);
     bool reopen = reopen_closed_nodes && !node.is_new() &&
                   !node.is_dead_end() && (current_g < node.get_g());
 
@@ -240,42 +240,42 @@ SearchStatus LazySearch<StateType, OperatorType>::step() {
         StateID dummy_id = current_predecessor_id;
         // HACK! HACK! we do this because SearchNode has no default/copy constructor
         if (dummy_id == StateID::no_state) {
-            const auto &initial_state = state_registry->get_initial_state();
+            const auto &initial_state = this->state_registry->get_initial_state();
             dummy_id = initial_state.get_id();
         }
-        auto parent_state = state_registry->lookup_state(dummy_id);
-        auto parent_node = search_space.get_node(parent_state);
+        auto parent_state = this->state_registry->lookup_state(dummy_id);
+        auto parent_node = this->search_space.get_node(parent_state);
 
         if (current_operator) {
             for (Heuristic<StateType, OperatorType> *heuristic : heuristics)
                 heuristic->notify_state_transition(
                     parent_state, *current_operator, current_state);
         }
-        statistics.inc_evaluated_states();
+		this->statistics.inc_evaluated_states();
         if (!open_list->is_dead_end(current_eval_context)) {
             // TODO: Generalize code for using multiple heuristics.
             if (reopen) {
                 node.reopen(parent_node, current_operator);
-                statistics.inc_reopened();
+                this->statistics.inc_reopened();
             } else if (current_predecessor_id == StateID::no_state) {
                 node.open_initial();
-                if (search_progress.check_progress(current_eval_context))
+                if (this->search_progress.check_progress(current_eval_context))
                     print_checkpoint_line(current_g);
             } else {
                 node.open(parent_node, current_operator);
             }
             node.close();
-            if (check_goal_and_set_plan(current_state))
+            if (this->check_goal_and_set_plan(current_state))
                 return SOLVED;
-            if (search_progress.check_progress(current_eval_context)) {
+            if (this->search_progress.check_progress(current_eval_context)) {
                 print_checkpoint_line(current_g);
                 reward_progress();
             }
             generate_successors();
-            statistics.inc_expanded();
+            this->statistics.inc_expanded();
         } else {
             node.mark_as_dead_end();
-            statistics.inc_dead_ends();
+            this->statistics.inc_dead_ends();
         }
         if (current_predecessor_id == StateID::no_state) {
             print_initial_h_values<StateType, OperatorType>(current_eval_context);
@@ -292,14 +292,14 @@ void LazySearch<StateType, OperatorType>::reward_progress() {
 template<class StateType, class OperatorType>
 void LazySearch<StateType, OperatorType>::print_checkpoint_line(int g) const {
     std::cout << "[g=" << g << ", ";
-    statistics.print_basic_statistics();
+    this->statistics.print_basic_statistics();
     std::cout << "]" << std::endl;
 }
 
 template<class StateType, class OperatorType>
 void LazySearch<StateType, OperatorType>::print_statistics() const {
-    statistics.print_detailed_statistics();
-    search_space.print_statistics();
+    this->statistics.print_detailed_statistics();
+    this->search_space.print_statistics();
 }
 
 }

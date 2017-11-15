@@ -15,7 +15,7 @@ class GlobalOperator;
 template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class PerStateInformationBase {
     using StateRegistryType = StateRegistryBase<StateType, OperatorType>;
-    friend class StateRegistryType;
+    friend StateRegistryType;
     virtual void remove_state_registry(StateRegistryType *registry) = 0;
 public:
     PerStateInformationBase() {

@@ -4,11 +4,13 @@
 #include "../tasks/cost_adapted_task.h"
 #include "../globals.h"
 
+template<>
 auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::lookup_state(StateID) const -> redblack::RBState {
 	assert(false && "implemented in child class");
 	utils::exit_with(utils::ExitCode::CRITICAL_ERROR);
 }
 
+template<>
 auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::get_successor_state(const redblack::RBState &, const redblack::RBOperator &) -> redblack::RBState {
 	assert(false && "implemented in child class");
 	utils::exit_with(utils::ExitCode::CRITICAL_ERROR);
@@ -39,7 +41,7 @@ RBStateRegistry::~RBStateRegistry() {}
 void RBStateRegistry::saturate_state(PackedStateBin *buffer, bool store_best_supporters) const {
 	std::vector<std::vector<int>> lowest_cost(task.get_num_variables());
 
-	for (size_t var = 0; var < task.get_num_variables(); ++var) {
+	for (size_t var = 0; var < static_cast<size_t>(task.get_num_variables()); ++var) {
 		if (painting->is_red_var(var)) {
 			lowest_cost[var].resize(task.get_variable_domain_size(var), -1);
 			for (int val = 0; val < task.get_variable_domain_size(var); ++val)

@@ -86,9 +86,9 @@ public:
     void compute_heuristic_for_cegar(const State &state);
 
     int get_cost_for_cegar(int var, int value) const {
-        assert(utils::in_bounds(var, propositions));
-        assert(utils::in_bounds(value, propositions[var]));
-        return propositions[var][value].cost;
+        assert(utils::in_bounds(var, this->propositions));
+        assert(utils::in_bounds(value, this->propositions[var]));
+        return this->propositions[var][value].cost;
     }
 };
 
@@ -130,17 +130,17 @@ template<class StateType, class OperatorType>
 void AdditiveHeuristic<StateType, OperatorType>::setup_exploration_queue() {
     queue.clear();
 
-    for (std::size_t var = 0; var < propositions.size(); ++var) {
-        for (std::size_t value = 0; value < propositions[var].size(); ++value) {
-            Proposition &prop = propositions[var][value];
+    for (std::size_t var = 0; var < this->propositions.size(); ++var) {
+        for (std::size_t value = 0; value < this->propositions[var].size(); ++value) {
+            Proposition &prop = this->propositions[var][value];
             prop.cost = -1;
             prop.marked = false;
         }
     }
 
     // Deal with operators and axioms without preconditions.
-    for (std::size_t i = 0; i < unary_operators.size(); ++i) {
-        UnaryOperator &op = unary_operators[i];
+    for (std::size_t i = 0; i < this->unary_operators.size(); ++i) {
+        UnaryOperator &op = this->unary_operators[i];
         op.unsatisfied_preconditions = op.precondition.size();
         op.cost = op.base_cost; // will be increased by precondition costs
 
@@ -158,7 +158,7 @@ void AdditiveHeuristic<StateType, OperatorType>::setup_exploration_queue_state(c
 
 template<class StateType, class OperatorType>
 void AdditiveHeuristic<StateType, OperatorType>::relaxed_exploration() {
-    int unsolved_goals = goal_propositions.size();
+    int unsolved_goals = this->goal_propositions.size();
     while (!queue.empty()) {
         std::pair<int, Proposition *> top_pair = queue.pop();
         int distance = top_pair.first;
@@ -202,7 +202,7 @@ void AdditiveHeuristic<StateType, OperatorType>::mark_preferred_operators(
                 // If we had no 0-cost operators and axioms to worry
                 // about, this would also be a sufficient condition.
 				if (is_operator_applicable(state, operator_no))
-					set_preferred(task_proxy.get_operators()[operator_no]);
+					this->set_preferred(this->task_proxy.get_operators()[operator_no]);
             }
         }
     }
@@ -223,10 +223,10 @@ int AdditiveHeuristic<StateType, OperatorType>::compute_add_and_ff(const Interna
     relaxed_exploration();
 
     int total_cost = 0;
-    for (size_t i = 0; i < goal_propositions.size(); ++i) {
-        int prop_cost = goal_propositions[i]->cost;
+    for (size_t i = 0; i < this->goal_propositions.size(); ++i) {
+        int prop_cost = this->goal_propositions[i]->cost;
         if (prop_cost == -1)
-            return DEAD_END;
+            return this->DEAD_END;
         increase_cost(total_cost, prop_cost);
     }
     return total_cost;
@@ -241,9 +241,9 @@ template<class StateType, class OperatorType>
 template<class InternalStateType>
 int AdditiveHeuristic<StateType, OperatorType>::compute_heuristic_internal(const InternalStateType &state) {
 	int h = compute_add_and_ff(state);
-	if (h != DEAD_END) {
-		for (size_t i = 0; i < goal_propositions.size(); ++i)
-			mark_preferred_operators(state, goal_propositions[i]);
+	if (h != this->DEAD_END) {
+		for (size_t i = 0; i < this->goal_propositions.size(); ++i)
+			mark_preferred_operators(state, this->goal_propositions[i]);
 	}
 	return h;
 }

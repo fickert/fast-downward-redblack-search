@@ -6,6 +6,7 @@
 
 #include "int_packer.h"
 
+
 namespace redblack {
 class RBState;
 class RBOperator;
@@ -47,5 +48,12 @@ public:
 };
 
 }
+
+
+template<>
+auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::lookup_state(StateID) const -> redblack::RBState;
+
+template<>
+auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::get_successor_state(const redblack::RBState &, const redblack::RBOperator &) -> redblack::RBState;
 
 #endif

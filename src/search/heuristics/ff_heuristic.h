@@ -42,7 +42,7 @@ public:
 template<class StateType, class OperatorType>
 FFHeuristic<StateType, OperatorType>::FFHeuristic(const options::Options &opts)
     : additive_heuristic::AdditiveHeuristic<StateType, OperatorType>(opts),
-      relaxed_plan(task_proxy.get_operators().size(), false) {
+      relaxed_plan(this->task_proxy.get_operators().size(), false) {
     std::cout << "Initializing FF heuristic..." << std::endl;
 }
 
@@ -71,8 +71,8 @@ void FFHeuristic<StateType, OperatorType>::mark_preferred_operators_and_relaxed_
                     // so we perform it to save work.
                     // If we had no 0-cost operators and axioms to worry
                     // about, it would also imply applicability.
-                    if (is_operator_applicable(state, operator_no))
-                        set_preferred(task_proxy.get_operators()[operator_no]);
+                    if (this->is_operator_applicable(state, operator_no))
+                        this->set_preferred(this->task_proxy.get_operators()[operator_no]);
                 }
             }
         }
@@ -87,19 +87,19 @@ int FFHeuristic<StateType, OperatorType>::compute_heuristic(const StateType &glo
 template<class StateType, class OperatorType>
 template<class InternalStateType>
 auto FFHeuristic<StateType, OperatorType>::compute_heuristic_internal(const InternalStateType &state) -> int {
-    int h_add = compute_add_and_ff(state);
-    if (h_add == DEAD_END)
+    int h_add = this->compute_add_and_ff(state);
+    if (h_add == this->DEAD_END)
         return h_add;
 
     // Collecting the relaxed plan also sets the preferred operators.
-    for (size_t i = 0; i < goal_propositions.size(); ++i)
-        mark_preferred_operators_and_relaxed_plan(state, goal_propositions[i]);
+    for (size_t i = 0; i < this->goal_propositions.size(); ++i)
+        mark_preferred_operators_and_relaxed_plan(state, this->goal_propositions[i]);
 
     int h_ff = 0;
     for (size_t op_no = 0; op_no < relaxed_plan.size(); ++op_no) {
         if (relaxed_plan[op_no]) {
             relaxed_plan[op_no] = false; // Clean up for next computation.
-            h_ff += task_proxy.get_operators()[op_no].get_cost();
+            h_ff += this->task_proxy.get_operators()[op_no].get_cost();
         }
     }
     return h_ff;

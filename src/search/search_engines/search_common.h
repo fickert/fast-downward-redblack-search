@@ -39,6 +39,19 @@ class Options;
 
 namespace search_common {
 
+/*
+  Create a standard scalar open list factory with the given "eval" and
+  "pref_only" options.
+*/
+template<class StateType, class OperatorType>
+extern std::shared_ptr<OpenListFactory<StateType, OperatorType>> create_standard_scalar_open_list_factory(
+    Evaluator<StateType, OperatorType> *eval, bool pref_only) {
+    options::Options options;
+    options.set("eval", eval);
+    options.set("pref_only", pref_only);
+    return std::make_shared<standard_scalar_open_list::StandardScalarOpenListFactory<StateType, OperatorType>>(options);
+}
+
 namespace detail {
 template<class StateType, class OperatorType>
 using GEval = g_evaluator::GEvaluator<StateType, OperatorType>;
@@ -105,21 +118,8 @@ Evaluator<StateType, OperatorType> *create_wastar_eval(GEval<StateType, Operator
         w_h_eval = h_eval;
     else
         w_h_eval = new WeightedEval<StateType, OperatorType>(h_eval, w);
-    return new SumEval<StateType, OperatorType>(vector<Evaluator<StateType, OperatorType> *>({g_eval, w_h_eval}));
+    return new SumEval<StateType, OperatorType>(std::vector<Evaluator<StateType, OperatorType> *>({g_eval, w_h_eval}));
 }
-}
-
-/*
-  Create a standard scalar open list factory with the given "eval" and
-  "pref_only" options.
-*/
-template<class StateType, class OperatorType>
-extern std::shared_ptr<OpenListFactory<StateType, OperatorType>> create_standard_scalar_open_list_factory(
-    Evaluator<StateType, OperatorType> *eval, bool pref_only) {
-    options::Options options;
-    options.set("eval", eval);
-    options.set("pref_only", pref_only);
-    return std::make_shared<standard_scalar_open_list::StandardScalarOpenListFactory<StateType, OperatorType>>(options);
 }
 
 /*

@@ -1,7 +1,7 @@
 #ifndef REDBLACK_UTIL_H
 #define REDBLACK_UTIL_H
 
-enum OperatorCost;
+#include "../operator_cost.h"
 
 namespace redblack {
 class RBOperator;

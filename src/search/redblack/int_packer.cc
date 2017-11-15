@@ -69,10 +69,11 @@ void RBIntPacker::update_var_info(int var, const std::vector<int> &ranges, int b
 	auto stored_bits = 0;
 	while (stored_bits < bits) {
 		unsigned int range;
+		static_assert(sizeof(range) * 8 == BITS_PER_BIN);
 		if (bits - stored_bits >= BITS_PER_BIN) {
-			range = pow(2, BITS_PER_BIN) - 1;
-		}
-		else {
+			assert(~0u == pow(2, BITS_PER_BIN) - 1);
+			range = ~0u;
+		} else {
 			range = pow(2, bits - stored_bits);
 		}
 		if (stored_bits == 0) {

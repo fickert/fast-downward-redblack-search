@@ -38,7 +38,7 @@ AlternationOpenList<Entry, StateType, OperatorType>::AlternationOpenList(const O
         opts.get_list<std::shared_ptr<OpenListFactory<StateType, OperatorType>>>("sublists"));
     open_lists.reserve(open_list_factories.size());
     for (const auto &factory : open_list_factories)
-        open_lists.push_back(factory->create_open_list<Entry>());
+        open_lists.push_back(factory->template create_open_list<Entry>());
 
     priorities.resize(open_lists.size(), 0);
 }

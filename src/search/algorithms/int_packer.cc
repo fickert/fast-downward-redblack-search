@@ -32,7 +32,7 @@ IntPacker::VariableInfo::VariableInfo(int range_, int bin_index_, int shift_)
 	: range(range_),
 	  bin_index(bin_index_),
 	  shift(shift_) {
-	if (static_cast<unsigned int>(range) == pow(2u, BITS_PER_BIN) - 1) {
+	if (static_cast<unsigned int>(range) == ~0u) {
 		clear_mask = 0;
 		read_mask = ~clear_mask;
 	} else {
@@ -64,7 +64,7 @@ bool IntPacker::VariableInfo::get_bit(const Bin *buffer, int value) const {
 }
 
 void IntPacker::VariableInfo::set_bit(Bin *buffer, int value) const {
-	assert(value >= 0 && pow(2u, value) < static_cast<unsigned int>(range));
+	assert(value >= 0 && 1ul << value < static_cast<unsigned int>(range));
 	Bin &bin = buffer[bin_index];
 	bin = bin | (1 << (shift + value));
 }

@@ -3,6 +3,12 @@
 
 #include "state_registry_base.h"
 
+template<>
+GlobalState StateRegistryBase<GlobalState, GlobalOperator>::get_successor_state(const GlobalState &predecessor, const GlobalOperator &op);
+
+template<>
+GlobalState StateRegistryBase<GlobalState, GlobalOperator>::lookup_state(StateID id) const;
+
 class StateRegistry : public StateRegistryBase<GlobalState, GlobalOperator> {
 public:
 	StateRegistry(

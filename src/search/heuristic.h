@@ -15,9 +15,7 @@
 #include <memory>
 #include "options/option_parser.h"
 
-#ifndef NDEBUG
 #include "globals.h"
-#endif
 
 class GlobalOperator;
 class GlobalState;
