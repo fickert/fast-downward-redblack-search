@@ -717,7 +717,7 @@ fast_downward_plugin(
     HELP "Red-black state space search"
     SOURCES
         redblack/incremental_painting_strategy
-        redblack/incremental_red_black_search
+        redblack/incremental_redblack_search
         redblack/int_packer
         redblack/operator
         redblack/painting

@@ -1,4 +1,4 @@
-#include "incremental_red_black_search.h"
+#include "incremental_redblack_search.h"
 
 #include "util.h"
 #include "../search_engine.h"
@@ -14,6 +14,7 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 	: SearchEngine<>(opts),
 	  rb_search_engine_options(get_rb_search_options(opts)),
 	  current_initial_state(state_registry->get_initial_state()),
+	  incremental_redblack_search_statistics(),
 	  rb_data(std::make_unique<RBData>(*opts.get<std::shared_ptr<Painting>>("base_painting"))),
 	  rb_search_engine(std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(g_initial_state_data))),
 	  incremental_painting_strategy(opts.get<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy")) {
@@ -78,8 +79,11 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	auto status = rb_search_engine->step();
 	if (status == IN_PROGRESS || status == FAILED)
 		return status;
-	if (status == FAILED)
+	if (status == FAILED) {
+		print_final_statistics();
+		std::cout << "Proved task unsolvable." << std::endl;
 		utils::exit_with(utils::ExitCode::UNSOLVABLE);
+	}
 	assert(status == SOLVED);
 	const auto &rb_plan = rb_search_engine->get_plan();
 	auto [is_plan, resulting_state] = is_real_plan(current_initial_state, rb_plan);
@@ -89,6 +93,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 		std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
 			[](const auto rb_operator) { return &g_operators[get_op_index_hacked(rb_operator)]; });
 		set_plan(plan);
+		print_final_statistics();
 		return SOLVED;
 	}
 	std::cout << "Red-black plan is not a real plan. Search continues with a new painting..." << std::endl;
@@ -104,6 +109,14 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	return IN_PROGRESS;
 }
 
+void IncrementalRedBlackSearch::print_final_statistics() const {
+	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
+		[](auto b) { return !b; });
+	std::cout << "Final painting has " << num_black << " black variables ("
+		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
+	std::cout << "Performed " << incremental_redblack_search_statistics.num_episodes << " episodes of red-black search." << std::endl;
+}
+
 
 static std::shared_ptr<SearchEngine<GlobalState, GlobalOperator>> _parse(options::OptionParser &parser) {
 	SearchEngine<GlobalState, GlobalOperator>::add_options_to_parser(parser);
@@ -115,5 +128,4 @@ static std::shared_ptr<SearchEngine<GlobalState, GlobalOperator>> _parse(options
 }
 
 static options::PluginShared<SearchEngine<GlobalState, GlobalOperator>> _plugin("incremental_rb", _parse);
-
 }

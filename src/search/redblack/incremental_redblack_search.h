@@ -38,6 +38,8 @@ protected:
 
 	void set_solution(const Plan &partial_plan, const GlobalState &state);
 
+	void print_final_statistics() const;
+
 	struct RBData {
 		Painting painting;
 		RBIntPacker int_packer;
@@ -56,6 +58,13 @@ protected:
 			return std::make_unique<RBStateRegistry>(*g_root_task(), int_packer, *g_axiom_evaluator, initial_state_data, operators);
 		}
 	};
+
+	struct IncrementalRedBlackSearchStatistics {
+		IncrementalRedBlackSearchStatistics()
+			: num_episodes(0) {}
+
+		int num_episodes;
+	} incremental_redblack_search_statistics;
 
 	std::unique_ptr<RBData> rb_data;
 
