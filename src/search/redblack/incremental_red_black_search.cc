@@ -81,15 +81,20 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	if (status == FAILED)
 		utils::exit_with(utils::ExitCode::UNSOLVABLE);
 	assert(status == SOLVED);
-	auto [is_plan, resulting_state] = is_real_plan(current_initial_state, rb_search_engine->get_plan());
+	const auto &rb_plan = rb_search_engine->get_plan();
+	auto [is_plan, resulting_state] = is_real_plan(current_initial_state, rb_plan);
 	if (is_plan) {
-		// TODO: set plan
+		auto plan = std::vector<const GlobalOperator *>();
+		plan.reserve(rb_plan.size());
+		std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
+			[](const auto rb_operator) { return &g_operators[get_op_index_hacked(rb_operator)]; });
+		set_plan(plan);
 		return SOLVED;
 	}
 	std::cout << "Red-black plan is not a real plan. Search continues with a new painting..." << std::endl;
 	auto plan = std::vector<OperatorID>();
-	plan.reserve(rb_search_engine->get_plan().size());
-	std::transform(std::begin(rb_search_engine->get_plan()), std::end(rb_search_engine->get_plan()), std::back_inserter(plan),
+	plan.reserve(rb_plan.size());
+	std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
 		[](const auto rb_operator) { return OperatorID(get_op_index_hacked(rb_operator)); });
 	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan));
 	current_initial_state = resulting_state;
