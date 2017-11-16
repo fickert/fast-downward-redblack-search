@@ -5,7 +5,6 @@
 
 #include <memory>
 
-
 template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class OpenListFactory {
 public:
@@ -27,18 +26,15 @@ public:
     std::unique_ptr<OpenList<T, StateType, OperatorType>> create_open_list();
 };
 
-
 template<class StateType, class OperatorType>
 template<typename T>
 std::unique_ptr<OpenList<T, StateType, OperatorType>> OpenListFactory<StateType, OperatorType>::create_open_list() {
 	if constexpr (std::is_same_v<T, StateOpenListEntry>) {
 		return create_state_open_list();
-	} else if constexpr (std::is_same_v<T, EdgeOpenListEntry>) {
-		return create_edge_open_list();
 	} else {
-		static_assert(false, "illegal open list entry type");
+		static_assert(std::is_same_v<T, EdgeOpenListEntry>, "unexpected open list type");
+		return create_edge_open_list();
 	}
 }
-// TODO: use partial specialization instead...?
 
 #endif
