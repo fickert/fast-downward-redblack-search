@@ -92,7 +92,7 @@ void IncrementalRedBlackSearch::add_options_to_parser(options::OptionParser &par
 SearchStatus IncrementalRedBlackSearch::step() {
 	assert(rb_search_engine->get_status() == IN_PROGRESS);
 	auto status = rb_search_engine->step();
-	if (status == IN_PROGRESS || status == FAILED)
+	if (status == IN_PROGRESS || status == TIMEOUT)
 		return status;
 	if (status == FAILED) {
 		if (current_initial_state.get_id() == state_registry->get_initial_state().get_id()) {
