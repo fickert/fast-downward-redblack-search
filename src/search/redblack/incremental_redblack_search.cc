@@ -22,15 +22,30 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 		[](auto b) { return !b; });
 	std::cout << "Starting incremental red-black search, initial painting has " << num_black << " black variables ("
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
+	auto initial_node = search_space.get_node(current_initial_state);
+	initial_node.open_initial();
+	initial_node.close();
+	incremental_redblack_search_statistics.num_episodes = 1;
 }
 
-auto IncrementalRedBlackSearch::is_real_plan(const GlobalState& initial_state, const RBPlan &plan) -> std::tuple<bool, GlobalState> {
-	auto current_state = initial_state;
-	for (auto plan_it = std::begin(plan); plan_it != std::end(plan); ++plan_it) {
-		const auto &op = (**plan_it).get_base_operator();
+auto IncrementalRedBlackSearch::update_search_space_and_check_plan(const RBPlan &plan) -> std::pair<bool, GlobalState> {
+	auto current_state = current_initial_state;
+	for (const auto rb_op : plan) {
+		const auto &op = rb_op->get_base_operator();
 		if (!op.is_applicable(current_state))
 			return {false, current_state};
+		auto current_parent_node = search_space.get_node(current_state);
+		assert(current_parent_node.is_closed());
 		current_state = state_registry->get_successor_state(current_state, op);
+		auto successor_node = search_space.get_node(current_state);
+		if (successor_node.is_new()) {
+			successor_node.open(current_parent_node, &op);
+			successor_node.close();
+		} else if (successor_node.is_closed() && current_parent_node.get_g() + get_adjusted_cost(op) < successor_node.get_g()) {
+			successor_node.reopen(current_parent_node, &op);
+			successor_node.close();
+		}
+		assert(successor_node.is_closed());
 	}
 	return {test_goal(current_state), current_state};
 }
@@ -80,18 +95,29 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	if (status == IN_PROGRESS || status == FAILED)
 		return status;
 	if (status == FAILED) {
-		print_final_statistics();
-		std::cout << "Proved task unsolvable." << std::endl;
-		utils::exit_with(utils::ExitCode::UNSOLVABLE);
+		if (current_initial_state.get_id() == state_registry->get_initial_state().get_id()) {
+			print_final_statistics();
+			std::cout << "Proved task unsolvable." << std::endl;
+			utils::exit_with(utils::ExitCode::UNSOLVABLE);
+		} else {
+			current_initial_state = state_registry->get_initial_state();
+			/*
+			  NOTE: ideally, we would be able to reuse information about the
+			  part of the search space that we already explored in the previous
+			  search (from a different initial state), but this is VERY
+			  difficult to do with FD's data structures.
+			*/
+			rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
+			rb_search_engine->initialize();
+			return IN_PROGRESS;
+		}
 	}
 	assert(status == SOLVED);
 	const auto &rb_plan = rb_search_engine->get_plan();
-	auto [is_plan, resulting_state] = is_real_plan(current_initial_state, rb_plan);
+	auto [is_plan, resulting_state] = update_search_space_and_check_plan(rb_plan);
 	if (is_plan) {
 		auto plan = std::vector<const GlobalOperator *>();
-		plan.reserve(rb_plan.size());
-		std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
-			[](const auto rb_operator) { return &g_operators[get_op_index_hacked(rb_operator)]; });
+		search_space.trace_path(resulting_state, plan);
 		set_plan(plan);
 		print_final_statistics();
 		return SOLVED;
@@ -106,6 +132,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
 	rb_search_engine->initialize();
 	assert(rb_search_engine->get_status() == IN_PROGRESS);
+	++incremental_redblack_search_statistics.num_episodes;
 	return IN_PROGRESS;
 }
 
