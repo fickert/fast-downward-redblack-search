@@ -100,6 +100,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 			std::cout << "Proved task unsolvable." << std::endl;
 			utils::exit_with(utils::ExitCode::UNSOLVABLE);
 		} else {
+			std::cout << "Red-black search failed to find a solution, restarting from the initial state..." << std::endl;
 			current_initial_state = state_registry->get_initial_state();
 			/*
 			  NOTE: ideally, we would be able to reuse information about the
@@ -108,7 +109,9 @@ SearchStatus IncrementalRedBlackSearch::step() {
 			  difficult to do with FD's data structures.
 			*/
 			rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
+			assert(rb_search_engine->get_status() == IN_PROGRESS);
 			rb_search_engine->initialize();
+			++incremental_redblack_search_statistics.num_restarts;
 			return IN_PROGRESS;
 		}
 	}
@@ -142,6 +145,7 @@ void IncrementalRedBlackSearch::print_final_statistics() const {
 	std::cout << "Final painting has " << num_black << " black variables ("
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 	std::cout << "Performed " << incremental_redblack_search_statistics.num_episodes << " episodes of red-black search." << std::endl;
+	std::cout << "Search was restarted " << incremental_redblack_search_statistics.num_restarts << " times after red-black search failed to find a solution." << std::endl;
 }
 
 

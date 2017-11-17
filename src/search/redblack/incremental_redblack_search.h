@@ -61,9 +61,11 @@ protected:
 
 	struct IncrementalRedBlackSearchStatistics {
 		IncrementalRedBlackSearchStatistics()
-			: num_episodes(0) {}
+			: num_episodes(0),
+			  num_restarts(0) {}
 
 		int num_episodes;
+		int num_restarts;
 	} incremental_redblack_search_statistics;
 
 	std::unique_ptr<RBData> rb_data;
