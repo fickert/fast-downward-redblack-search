@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <map>
+#include "incremental_redblack_search.h"
 
 using namespace std;
 
@@ -39,21 +40,9 @@ auto PaintingFactory::get_cg_leaves_painting() -> InternalPaintingType {
 }
 
 
-auto get_num_black_vars(const options::Options &opts) -> int {
-	assert(opts.contains("num_black_vars") || opts.contains("ratio_black"));
-	auto num_black_vars = opts.contains("num_black_vars") ? opts.get<int>("num_black_vars") : -1;
-	if (num_black_vars == -1) {
-		assert(opts.contains("ratio_black"));
-		num_black_vars = g_root_task()->get_num_variables() * opts.get<int>("ratio_black") / 100.;
-	}
-	num_black_vars = std::min(num_black_vars, g_root_task()->get_num_variables());
-	return num_black_vars;
-}
-
-
 CGTopFirstPaintingFactory::CGTopFirstPaintingFactory(const options::Options &opts) 
 	: PaintingFactory(opts),
-	  num_black_vars(get_num_black_vars(opts)) {}
+	  num_black_vars(get_num_black(opts)) {}
 
 auto CGTopFirstPaintingFactory::construct_painting() -> InternalPaintingType {
 	auto painting = get_all_red_painting();
@@ -75,7 +64,7 @@ auto CGTopFirstPaintingFactory::construct_painting() -> InternalPaintingType {
 
 CGBranchFirstPaintingFactory::CGBranchFirstPaintingFactory(const options::Options &opts)
 	: PaintingFactory(opts),
-	  num_black_vars(get_num_black_vars(opts)),
+	  num_black_vars(get_num_black(opts)),
 	  scc_painted(),
 	  scc_offset_to_level() {}
 
@@ -313,7 +302,7 @@ auto CGBranchFirstPaintingFactory::construct_painting() -> InternalPaintingType 
 
 IncSCCLvlPaintingFactory::IncSCCLvlPaintingFactory(const options::Options &opts)
 	: PaintingFactory(opts),
-	  num_black_vars(get_num_black_vars(opts)),
+	  num_black_vars(get_num_black(opts)),
 	  random_within_scc(opts.get<bool>("scc_random")),
 	  rng(utils::parse_rng_from_options(opts)) {}
 
@@ -477,14 +466,13 @@ void PaintingFactory::add_options_to_parser(options::OptionParser &parser) {
     parser.add_option<bool>("force_cg_leaves_red", "", "false");
     parser.add_option<bool>("incremental_search", "", "false");
 	utils::add_rng_options(parser);
+	add_num_black_options(parser);
 }
 
 static auto _parse_cg_top_first(options::OptionParser &parser) -> std::shared_ptr<Painting> {
     // TODO docu
 	PaintingFactory::add_options_to_parser(parser);
-	parser.add_option<int>("num_black_vars", "The number of variables to paint black");
-    parser.add_option<int>("ratio_black", "give the ratio in percent, i.e. ratio in [0, 100]", "0", options::Bounds("0", "100"));
-    
+
 	if (parser.help_mode() || parser.dry_run())
 		return nullptr;
 	return std::make_shared<Painting>(CGTopFirstPaintingFactory(parser.parse()).construct_painting());
@@ -492,8 +480,6 @@ static auto _parse_cg_top_first(options::OptionParser &parser) -> std::shared_pt
 
 static auto _parse_cg_branches_first(options::OptionParser &parser) -> std::shared_ptr<Painting> {
 	PaintingFactory::add_options_to_parser(parser);
-	parser.add_option<int>("num_black_vars", "The number of variables to paint black");
-	parser.add_option<int>("ratio_black", "give the ratio in percent, i.e. ratio in [0, 100]", "0", options::Bounds("0", "100"));
 
 	if (parser.help_mode() || parser.dry_run())
 		return nullptr;
@@ -502,8 +488,6 @@ static auto _parse_cg_branches_first(options::OptionParser &parser) -> std::shar
 
 static auto _parse_inc_scc_lvl(options::OptionParser &parser) -> std::shared_ptr<Painting> {
 	PaintingFactory::add_options_to_parser(parser);
-	parser.add_option<int>("num_black_vars", "The number of variables to paint black");
-	parser.add_option<int>("ratio_black", "give the ratio in percent, i.e. ratio in [0, 100]", "0", options::Bounds("0", "100"));
     parser.add_option<bool>("scc_random", "TODO", "false");
 
 	if (parser.help_mode() || parser.dry_run())

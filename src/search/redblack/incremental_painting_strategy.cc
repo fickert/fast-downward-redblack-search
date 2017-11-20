@@ -1,6 +1,7 @@
 #include "incremental_painting_strategy.h"
 
 #include "painting_utils.h"
+#include "util.h"
 #include "../global_operator.h"
 #include "../globals.h"
 #include "../options/options.h"
@@ -22,10 +23,6 @@ IncrementalPaintingStrategy::IncrementalPaintingStrategy(const options::Options 
 IncrementalPaintingStrategy::~IncrementalPaintingStrategy() {}
 
 
-auto get_num_black(int num_black, double percentage) -> int {
-	return num_black < 1 ? percentage * g_root_task()->get_num_variables() : num_black;
-}
-
 auto LeastConflictsPaintingStrategy::get_variable_levels() -> std::vector<int> {
 	auto scc_levels = rbutils::get_scc_levels(rbutils::get_sccs({}));
 	auto variable_levels = std::vector<int>(g_root_task()->get_num_variables(), -1);
@@ -43,7 +40,7 @@ auto LeastConflictsPaintingStrategy::get_variable_levels() -> std::vector<int> {
 LeastConflictsPaintingStrategy::LeastConflictsPaintingStrategy(const options::Options &opts)
 	: IncrementalPaintingStrategy(opts),
 	  prefer_lvl(opts.get<bool>("prefer_lvl")),
-	  num_black(get_num_black(opts.get<int>("num_black"), opts.get<double>("black_percentage"))) {}
+	  num_black(get_num_black(opts)) {}
 
 auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting {
 	auto conflicts = std::vector<int>(g_root_task()->get_num_variables(), 0);
@@ -103,8 +100,7 @@ auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last
 }
 
 static auto _parse_least_conflicts(options::OptionParser &parser) -> std::shared_ptr<IncrementalPaintingStrategy> {
-	parser.add_option<int>("num_black", "number of additional variables to be painted black", "1", options::Bounds("0", "infinity"));
-	parser.add_option<double>("black_percentage", "percentage of variables to be painted black", "0", options::Bounds("0", "infinity"));
+	add_num_black_options(parser);
 
 	parser.add_option<bool>("prefer_lvl", "TODO", "false");
 
@@ -116,7 +112,7 @@ static auto _parse_least_conflicts(options::OptionParser &parser) -> std::shared
 
 RandomPaintingStrategy::RandomPaintingStrategy(const options::Options &opts)
 	: IncrementalPaintingStrategy(opts),
-	  num_black(get_num_black(opts.get<int>("num_black"), opts.get<double>("black_percentage"))),
+	  num_black(get_num_black(opts)),
 	  rng(utils::parse_rng_from_options(opts)) {}
 
 auto RandomPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &) -> Painting {
@@ -133,9 +129,7 @@ auto RandomPaintingStrategy::generate_next_painting(const Painting &last_paintin
 }
 
 static auto _parse_random(options::OptionParser &parser) -> std::shared_ptr<IncrementalPaintingStrategy> {
-	parser.add_option<int>("num_black", "number of additional variables to be painted black", "1", options::Bounds("0", "infinity"));
-	parser.add_option<double>("black_percentage", "percentage of variables to be painted black", "0", options::Bounds("0", "infinity"));
-
+	add_num_black_options(parser);
 	utils::add_rng_options(parser);
 
 	if (parser.help_mode() || parser.dry_run())
