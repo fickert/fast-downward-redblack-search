@@ -72,6 +72,9 @@ protected:
 	std::unique_ptr<SearchEngine<RBState, RBOperator>> rb_search_engine;
 	std::shared_ptr<IncrementalPaintingStrategy> incremental_painting_strategy;
 
+	// options
+	const bool continue_from_first_conflict;
+
 	static auto get_rb_search_options(const options::Options &options) -> options::Options;
 };
 }

@@ -17,7 +17,8 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 	  incremental_redblack_search_statistics(),
 	  rb_data(std::make_unique<RBData>(*opts.get<std::shared_ptr<Painting>>("base_painting"))),
 	  rb_search_engine(std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(g_initial_state_data))),
-	  incremental_painting_strategy(opts.get<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy")) {
+	  incremental_painting_strategy(opts.get<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy")),
+	  continue_from_first_conflict(opts.get<bool>("continue_from_first_conflict")) {
 	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
 		[](auto b) { return !b; });
 	std::cout << "Starting incremental red-black search, initial painting has " << num_black << " black variables ("
@@ -131,7 +132,8 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
 		[](const auto rb_operator) { return OperatorID(get_op_index_hacked(rb_operator)); });
 	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan));
-	current_initial_state = resulting_state;
+	if (continue_from_first_conflict)
+		current_initial_state = resulting_state;
 	rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
 	rb_search_engine->initialize();
 	assert(rb_search_engine->get_status() == IN_PROGRESS);
@@ -152,6 +154,9 @@ void IncrementalRedBlackSearch::print_final_statistics() const {
 static std::shared_ptr<SearchEngine<GlobalState, GlobalOperator>> _parse(options::OptionParser &parser) {
 	SearchEngine<GlobalState, GlobalOperator>::add_options_to_parser(parser);
 	IncrementalRedBlackSearch::add_options_to_parser(parser);
+
+	parser.add_option<bool>("continue_from_first_conflict", "Continue next iteration of red-black search from the first conflicting state in the previous red-black plan.", "true");
+
 	auto opts = parser.parse();
 	if (parser.help_mode() || parser.dry_run())
 		return nullptr;
