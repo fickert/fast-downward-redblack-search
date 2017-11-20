@@ -23,7 +23,7 @@ class Painting {
 public:
 	Painting(const InternalPaintingType &painting);
 	Painting(InternalPaintingType &&painting);
-	virtual ~Painting() = default;
+	~Painting() = default;
 
 	bool is_black_var(int var) const {
 		return !painting[var];
@@ -31,6 +31,14 @@ public:
 
 	bool is_red_var(int var) const {
 		return painting[var];
+	}
+
+	auto operator==(const Painting &other) const -> bool {
+		return painting == other.painting;
+	}
+
+	auto operator!=(const Painting &other) const -> bool {
+		return !operator==(other);
 	}
 
 	auto get_painting() const -> const InternalPaintingType & { return painting; }

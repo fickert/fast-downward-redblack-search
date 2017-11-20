@@ -12,7 +12,7 @@ template<>
 void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redblack::RBState &goal_state, std::vector<const redblack::RBOperator*> &path) const {
 	assert(dynamic_cast<redblack::RBStateRegistry *>(&state_registry));
 	assert(dynamic_cast<redblack::RBStateRegistry *>(&state_registry) == &goal_state.get_rb_state_registry());
-	const auto &rb_state_registry = goal_state.get_rb_state_registry();
+	auto &rb_state_registry = *dynamic_cast<redblack::RBStateRegistry *>(&state_registry);
 	const auto &operators = rb_state_registry.get_operators();
 	auto current_state = goal_state;
 	std::vector<std::vector<std::vector<OperatorID>>> best_supporters;
@@ -21,9 +21,8 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
     for (;;) {          // backtrace solution path
         const SearchNodeInfo &info = search_node_infos[current_state];
 
-        if (info.creating_operator == -1) {  // reached initial state => done
+        if (info.parent_state_id == StateID::no_state) {  // reached initial state => done
             best_supporters.push_back(rb_state_registry.get_initial_state_best_supporters());
-            assert(info.parent_state_id == StateID::no_state);
             break;
         }
         const redblack::RBOperator *op = &operators[info.creating_operator];
@@ -32,8 +31,7 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
         path.push_back(op);
         current_state = state_registry.lookup_state(info.parent_state_id);
 
-        state_registry.get_successor_state(current_state, *op);
-        best_supporters.push_back(rb_state_registry.get_stored_best_supporters());
+        best_supporters.push_back(rb_state_registry.get_best_supporters_for_successor(current_state, *op));
         // TODO to not waste so much memory, could do the whole relaxed plan reconstruction here
     }
     std::reverse(path.begin(), path.end());

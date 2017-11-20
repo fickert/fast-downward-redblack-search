@@ -23,6 +23,7 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 	}
 
 	void saturate_state(PackedStateBin *buffer, bool store_best_supporters = false) const;
+	void build_unsaturated_successor(const RBState &predecessor, const RBOperator &op, PackedStateBin *buffer) const;
 
 public:
 	RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
@@ -41,6 +42,8 @@ public:
 	auto lookup_state(StateID id) const -> RBState override;
 	auto get_initial_state() -> const RBState & override;
 	auto get_successor_state(const RBState &predecessor, const RBOperator &op) -> RBState override;
+
+	auto get_best_supporters_for_successor(const RBState &predecessor, const RBOperator &op) const -> const std::vector<std::vector<OperatorID>> &;
 
 	auto get_painting() const -> const Painting & { return *painting; }
 
