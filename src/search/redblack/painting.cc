@@ -511,9 +511,23 @@ static auto _parse_inc_scc_lvl(options::OptionParser &parser) -> std::shared_ptr
 	return std::make_shared<Painting>(IncSCCLvlPaintingFactory(parser.parse()).construct_painting());
 }
 
+static auto _parse_all_red(options::OptionParser &parser) -> std::shared_ptr<Painting> {
+	if (parser.help_mode() || parser.dry_run())
+		return nullptr;
+	return std::make_shared<Painting>(PaintingFactory::get_all_red_painting());
+}
+
+static auto _parse_all_black(options::OptionParser &parser) -> std::shared_ptr<Painting> {
+	if (parser.help_mode() || parser.dry_run())
+		return nullptr;
+	return std::make_shared<Painting>(PaintingFactory::get_all_black_painting());
+}
+
 static options::PluginShared<Painting> _plugin_cg_top_first("cg_top_first", _parse_cg_top_first);
 static options::PluginShared<Painting> _plugin_cg_branches_first("cg_branches_first", _parse_cg_branches_first);
 static options::PluginShared<Painting> _plugin_inc_scc_lvl("inc_scc_lvl", _parse_inc_scc_lvl);
+static options::PluginShared<Painting> _plugin_all_red("all_red", _parse_all_red);
+static options::PluginShared<Painting> _plugin_all_black("all_black", _parse_all_black);
 
 static options::PluginTypePlugin<Painting> _type_plugin("Red-Black Painting",
 	"Strategies to generate a painting for red-black partial delete relaxation.");

@@ -54,12 +54,12 @@ public:
 	virtual auto construct_painting() -> InternalPaintingType = 0;
 
 	static void add_options_to_parser(options::OptionParser &parser);
-
-protected:
-	const bool force_cg_leaves_red;
 	
 	static auto get_all_red_painting() -> InternalPaintingType;
 	static auto get_all_black_painting() -> InternalPaintingType;
+
+protected:
+	const bool force_cg_leaves_red;
 	static auto get_cg_leaves_painting() -> InternalPaintingType;
 };
 
@@ -87,7 +87,7 @@ class CGBranchFirstPaintingFactory : public PaintingFactory {
 public:
 	CGBranchFirstPaintingFactory(const options::Options &opts);
 
-	auto construct_painting()->InternalPaintingType override;
+	auto construct_painting() -> InternalPaintingType override;
 };
 
 
@@ -100,17 +100,6 @@ class IncSCCLvlPaintingFactory : public PaintingFactory {
 
 public:
 	IncSCCLvlPaintingFactory(const options::Options &opts);
-
-	auto construct_painting() -> InternalPaintingType override;
-};
-
-
-class LeastConflictsPaintingFactory : public PaintingFactory {
-	const int num_black_vars;
-	const bool prefer_lvl;
-
-public:
-	LeastConflictsPaintingFactory(const options::Options &opts);
 
 	auto construct_painting() -> InternalPaintingType override;
 };
