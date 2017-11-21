@@ -36,6 +36,16 @@ void IncrementalRedBlackSearch::initialize_rb_search_engine() {
 	rb_search_engine->initialize();
 }
 
+void IncrementalRedBlackSearch::update_statistics() {
+	statistics.inc_dead_ends(rb_search_engine->statistics.get_dead_ends());
+	statistics.inc_evaluated_states(rb_search_engine->statistics.get_evaluated_states());
+	statistics.inc_evaluations(rb_search_engine->statistics.get_evaluations());
+	statistics.inc_expanded(rb_search_engine->statistics.get_expanded());
+	statistics.inc_generated(rb_search_engine->statistics.get_generated());
+	statistics.inc_generated_ops(rb_search_engine->statistics.get_generated_ops());
+	statistics.inc_reopened(rb_search_engine->statistics.get_reopened());
+}
+
 auto IncrementalRedBlackSearch::update_search_space_and_check_plan(const RBPlan &plan) -> std::pair<bool, GlobalState> {
 	auto current_state = current_initial_state;
 	for (const auto rb_op : plan) {
@@ -101,6 +111,8 @@ void IncrementalRedBlackSearch::add_options_to_parser(options::OptionParser &par
 SearchStatus IncrementalRedBlackSearch::step() {
 	assert(rb_search_engine->get_status() == IN_PROGRESS);
 	auto status = rb_search_engine->step();
+	if (status != IN_PROGRESS)
+		update_statistics();
 	if (status == IN_PROGRESS || status == TIMEOUT)
 		return status;
 	if (status == FAILED) {
