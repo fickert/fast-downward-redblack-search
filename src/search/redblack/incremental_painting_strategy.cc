@@ -19,7 +19,7 @@ namespace redblack {
 // incremental painting strategy base class
 
 IncrementalPaintingStrategy::IncrementalPaintingStrategy(const options::Options &opts)
-	: num_black(get_num_black(opts)) {
+	: num_black(get_num_black(opts, true)) {
 	if (num_black < 1 || num_black > g_root_task()->get_num_variables()) {
 		std::cerr << "Bad value for num_black in incremental painting strategy: " << num_black << std::endl;
 		utils::exit_with(utils::ExitCode::CRITICAL_ERROR);

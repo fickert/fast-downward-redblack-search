@@ -16,7 +16,7 @@ class Options;
 
 namespace redblack {
 void add_num_black_options(options::OptionParser &parser);
-auto get_num_black(const options::Options &opts) -> int;
+auto get_num_black(const options::Options &opts, bool min_one_if_ratio = false) -> int;
 }
 
 
