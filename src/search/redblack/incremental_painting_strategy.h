@@ -9,6 +9,7 @@
 #include "painting.h"
 #include "../operator_id.h"
 
+
 namespace redblack {
 
 class IncrementalPaintingStrategy {
@@ -16,14 +17,17 @@ protected:
 	explicit IncrementalPaintingStrategy(const options::Options &opts);
 	virtual ~IncrementalPaintingStrategy();
 
+	const int num_black;
+
 public:
 	virtual auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting = 0;
+
+	static void add_options_to_parser(options::OptionParser &parser);
 };
 
 
 class LeastConflictsPaintingStrategy : public IncrementalPaintingStrategy {
 	const bool prefer_lvl;
-	const int num_black;
 
 	static auto get_variable_levels() -> std::vector<int>;
 
@@ -36,7 +40,6 @@ public:
 
 
 class RandomPaintingStrategy : public IncrementalPaintingStrategy {
-	const int num_black;
 	const std::shared_ptr<utils::RandomNumberGenerator> rng;
 
 public:

@@ -87,6 +87,7 @@ void IncrementalRedBlackSearch::add_options_to_parser(options::OptionParser &par
 	parser.add_option<std::shared_ptr<Painting>>("base_painting", "painting to be used in the initial red-black search", "cg_top_first()");
 	parser.add_option<Heuristic<RBState, RBOperator> *>("heuristic", "red-black heuristic that will be passed to the underlying red-black search engine", "ff_rb(transform=adapt_costs(cost_type=1))");
 	parser.add_option<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy", "strategy for painting more variables black after finding a red-black solution with conflicts", "least_conflicts()");
+	parser.add_option<bool>("continue_from_first_conflict", "Continue next iteration of red-black search from the first conflicting state in the previous red-black plan.", "true");
 	add_succ_order_options(parser);
 }
 
@@ -126,12 +127,16 @@ SearchStatus IncrementalRedBlackSearch::step() {
 		print_final_statistics();
 		return SOLVED;
 	}
-	std::cout << "Red-black plan is not a real plan. Search continues with a new painting..." << std::endl;
 	auto plan = std::vector<OperatorID>();
 	plan.reserve(rb_plan.size());
 	std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
 		[](const auto rb_operator) { return OperatorID(get_op_index_hacked(rb_operator)); });
 	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan));
+	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
+		[](auto b) { return !b; });
+	std::cout << "Red-black plan is not a real plan. Search continues with a new painting, "
+		<< num_black << " black variables ("
+		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)..." << std::endl;
 	if (continue_from_first_conflict)
 		current_initial_state = resulting_state;
 	rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
@@ -154,8 +159,6 @@ void IncrementalRedBlackSearch::print_final_statistics() const {
 static std::shared_ptr<SearchEngine<GlobalState, GlobalOperator>> _parse(options::OptionParser &parser) {
 	SearchEngine<GlobalState, GlobalOperator>::add_options_to_parser(parser);
 	IncrementalRedBlackSearch::add_options_to_parser(parser);
-
-	parser.add_option<bool>("continue_from_first_conflict", "Continue next iteration of red-black search from the first conflicting state in the previous red-black plan.", "true");
 
 	auto opts = parser.parse();
 	if (parser.help_mode() || parser.dry_run())
