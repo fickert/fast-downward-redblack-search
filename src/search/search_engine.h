@@ -38,7 +38,6 @@ template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class SearchEngine {
 public:
     typedef std::vector<const OperatorType *> Plan;
-	friend class redblack::IncrementalRedBlackSearch;
 private:
     SearchStatus status;
     bool solution_found;

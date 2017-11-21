@@ -21,6 +21,7 @@ class Options;
 namespace lazy_search {
 template<class StateType = GlobalState, class OperatorType = GlobalOperator>
 class LazySearch : public SearchEngine<StateType, OperatorType> {
+	friend class redblack::IncrementalRedBlackSearch;
 protected:
     std::unique_ptr<EdgeOpenList<StateType, OperatorType>> open_list;
 

@@ -27,6 +27,13 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 	initial_node.open_initial();
 	initial_node.close();
 	incremental_redblack_search_statistics.num_episodes = 1;
+	initialize_rb_search_engine();
+}
+
+void IncrementalRedBlackSearch::initialize_rb_search_engine() {
+	auto pref_operator_heuristics = rb_search_engine_options.get_list<Heuristic<RBState, RBOperator> *>("preferred");
+	rb_search_engine->set_pref_operator_heuristics(pref_operator_heuristics);
+	rb_search_engine->initialize();
 }
 
 auto IncrementalRedBlackSearch::update_search_space_and_check_plan(const RBPlan &plan) -> std::pair<bool, GlobalState> {
@@ -111,8 +118,8 @@ SearchStatus IncrementalRedBlackSearch::step() {
 			  difficult to do with FD's data structures.
 			*/
 			rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
+			initialize_rb_search_engine();
 			assert(rb_search_engine->get_status() == IN_PROGRESS);
-			rb_search_engine->initialize();
 			++incremental_redblack_search_statistics.num_restarts;
 			return IN_PROGRESS;
 		}
@@ -140,7 +147,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	if (continue_from_first_conflict)
 		current_initial_state = resulting_state;
 	rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(current_initial_state.get_values()));
-	rb_search_engine->initialize();
+	initialize_rb_search_engine();
 	assert(rb_search_engine->get_status() == IN_PROGRESS);
 	++incremental_redblack_search_statistics.num_episodes;
 	return IN_PROGRESS;

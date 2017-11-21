@@ -32,6 +32,7 @@ protected:
 	using InternalRBSearchEngine = lazy_search::LazySearch<RBState, RBOperator>;
 	const options::Options rb_search_engine_options;
 
+	void initialize_rb_search_engine();
 	auto update_search_space_and_check_plan(const RBPlan &plan) -> std::pair<bool, GlobalState>;
 
 	GlobalState current_initial_state;
@@ -69,7 +70,7 @@ protected:
 	} incremental_redblack_search_statistics;
 
 	std::unique_ptr<RBData> rb_data;
-	std::unique_ptr<SearchEngine<RBState, RBOperator>> rb_search_engine;
+	std::unique_ptr<InternalRBSearchEngine> rb_search_engine;
 	std::shared_ptr<IncrementalPaintingStrategy> incremental_painting_strategy;
 
 	// options
