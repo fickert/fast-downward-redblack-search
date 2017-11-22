@@ -40,7 +40,7 @@ protected:
 
 	void set_solution(const Plan &partial_plan, const GlobalState &state);
 
-	void print_final_statistics() const;
+	void print_statistics() const override;
 
 	struct RBData {
 		Painting painting;

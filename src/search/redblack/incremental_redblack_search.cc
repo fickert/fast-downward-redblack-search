@@ -117,7 +117,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 		return status;
 	if (status == FAILED) {
 		if (current_initial_state.get_id() == state_registry->get_initial_state().get_id()) {
-			print_final_statistics();
+			print_statistics();
 			std::cout << "Proved task unsolvable." << std::endl;
 			utils::exit_with(utils::ExitCode::UNSOLVABLE);
 		} else {
@@ -143,7 +143,6 @@ SearchStatus IncrementalRedBlackSearch::step() {
 		auto plan = std::vector<const GlobalOperator *>();
 		search_space.trace_path(resulting_state, plan);
 		set_plan(plan);
-		print_final_statistics();
 		return SOLVED;
 	}
 	auto plan = std::vector<OperatorID>();
@@ -165,13 +164,15 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	return IN_PROGRESS;
 }
 
-void IncrementalRedBlackSearch::print_final_statistics() const {
+void IncrementalRedBlackSearch::print_statistics() const {
 	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
 		[](auto b) { return !b; });
 	std::cout << "Final painting has " << num_black << " black variables ("
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 	std::cout << "Performed " << incremental_redblack_search_statistics.num_episodes << " episodes of red-black search." << std::endl;
 	std::cout << "Search was restarted " << incremental_redblack_search_statistics.num_restarts << " times after red-black search failed to find a solution." << std::endl;
+	statistics.print_detailed_statistics();
+	search_space.print_statistics();
 }
 
 
