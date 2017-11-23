@@ -10,12 +10,22 @@
 
 namespace redblack {
 
+auto paint_red_conditional_effect_conditions_black(const Painting &base_painting) -> Painting {
+	if (!any_conditional_effect_condition_is_red(base_painting))
+		return base_painting;
+	auto num_black = std::count_if(std::begin(base_painting.get_painting()), std::end(base_painting.get_painting()),
+		[](auto b) { return !b; });
+	std::cout << "Base painting has operators with red conditional effect conditions! Original painting had " << num_black << " black variables("
+		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%), updating..." << std::endl;
+	return get_no_red_conditional_effect_conditions_painting(base_painting);
+}
+
 IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opts)
 	: SearchEngine<>(opts),
 	  rb_search_engine_options(get_rb_search_options(opts)),
 	  current_initial_state(state_registry->get_initial_state()),
 	  incremental_redblack_search_statistics(),
-	  rb_data(std::make_unique<RBData>(*opts.get<std::shared_ptr<Painting>>("base_painting"))),
+	  rb_data(std::make_unique<RBData>(paint_red_conditional_effect_conditions_black(*opts.get<std::shared_ptr<Painting>>("base_painting")))),
 	  rb_search_engine(std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, rb_data->construct_state_registry(g_initial_state_data))),
 	  incremental_painting_strategy(opts.get<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy")),
 	  continue_from_first_conflict(opts.get<bool>("continue_from_first_conflict")) {

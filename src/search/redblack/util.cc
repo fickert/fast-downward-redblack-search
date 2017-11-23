@@ -29,4 +29,23 @@ auto get_num_black(const options::Options &opts, bool min_one_if_ratio) -> int {
 	}
 	return std::min(num_variables, opts.get<int>("num_black"));
 }
+
+auto any_conditional_effect_condition_is_red(const Painting &painting) -> int {
+	for (const auto &op : g_operators)
+		for (const auto &effect : op.get_effects())
+			for (const auto &condition : effect.conditions)
+				if (painting.is_red_var(condition.var))
+					return true;
+	return false;
+}
+
+auto get_no_red_conditional_effect_conditions_painting(const Painting &painting) -> Painting {
+	auto new_painting = painting.get_painting();
+	for (const auto &op : g_operators)
+		for (const auto &effect : op.get_effects())
+			for (const auto &condition : effect.conditions)
+				if (new_painting[condition.var])
+					new_painting[condition.var] = false;
+	return Painting(new_painting);
+}
 }

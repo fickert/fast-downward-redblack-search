@@ -25,6 +25,29 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 	void saturate_state(PackedStateBin *buffer, bool store_best_supporters = false) const;
 	void build_unsaturated_successor(const RBState &predecessor, const RBOperator &op, PackedStateBin *buffer) const;
 
+
+	// data structures and class members for the relaxed exploration
+	struct Counter {
+		Counter(int num_preconditions) :
+			effects(), num_preconditions(num_preconditions), value(0) {}
+
+		struct Effect {
+			Effect(const FactPair &fact, const OperatorID &supporter) :
+				fact(fact), supporter(supporter) {}
+
+			const FactPair fact;
+			const OperatorID supporter;
+		};
+
+		// effect, achieving operator
+		std::vector<Effect> effects;
+		const int num_preconditions;
+		int value;
+	};
+
+	mutable std::vector<Counter> counters;
+	std::vector<std::vector<std::vector<std::size_t>>> precondition_of;
+
 public:
 	RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
 	                AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data,

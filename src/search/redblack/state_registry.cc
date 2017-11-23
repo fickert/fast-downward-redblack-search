@@ -1,6 +1,8 @@
 #include "state_registry.h"
 #include "state.h"
 #include "operator.h"
+#include "util.h"
+
 #include "../tasks/cost_adapted_task.h"
 #include "../globals.h"
 
@@ -19,6 +21,14 @@ auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::get_successor_s
 
 namespace redblack {
 
+auto contains_mutex(const std::vector<FactPair> &facts) -> bool {
+	for (std::size_t i = 0; i < facts.size(); ++i)
+		for (std::size_t j = i + 1; j < facts.size(); ++j)
+			if (are_mutex(facts[i], facts[j]))
+				return true;
+	return false;
+}
+
 RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
 	                             AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data,
 	                             const std::vector<RBOperator> &operators, PackedStateBin *rb_initial_state_data)
@@ -26,13 +36,79 @@ RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &st
 	  painting(&state_packer.get_painting()),
 	  initial_state_best_supporters(),
 	  cached_best_supporters(task.get_num_variables()),
-	  operators(operators) {
+	  operators(operators),
+	  counters(),
+	  precondition_of(task.get_num_variables()) {
 	if (rb_initial_state_data) {
 		// TODO: make sure the passed initial state data matches the painting
 		state_data_pool.push_back(rb_initial_state_data);
 		StateID id = insert_id_or_pop_state();
 		cached_initial_state = new RBState(state_data_pool[id.value], *this, id, *painting, rb_state_packer());
 	}
+	// initialize counters
+	assert(!any_conditional_effect_condition_is_red(*painting));
+	auto counter_for_preconditions = std::unordered_map<std::vector<FactPair>, std::size_t>();
+	auto get_counter_pos_for_preconditions = [&counter_for_preconditions, this](const auto &preconditions) {
+		auto [pos, inserted] = counter_for_preconditions.insert({preconditions, counters.size()});
+		if (inserted) {
+			for (const auto &precondition : preconditions)
+				precondition_of[precondition.var][precondition.value].push_back(counters.size());
+			counters.emplace_back(preconditions.size());
+		}
+		return pos->second;
+	};
+	auto add_effect = [](auto &counter, auto var, auto val, const auto &op) {
+		counter.effects.emplace_back(FactPair{var, val}, op.get_id());
+	};
+	for (auto var = 0; var < task.get_num_variables(); ++var)
+		precondition_of[var].resize(task.get_variable_domain_size(var));
+	for (const auto &op : operators) {
+		if (op.get_red_effects().empty())
+			continue;
+		// 3 cases:
+		// a) doesn't modify black variables ==> fine
+		// b) conditionally modifies black variables ==> need negative preconditions that prevent these conditional effects from triggering
+		// c) always modifies black variables ==> ignore this operator
+		auto changes_black_variable = false;
+		auto preconditions = std::vector<FactPair>();
+		for (const auto &precondition : op.get_base_operator().get_preconditions())
+			preconditions.emplace_back(precondition.var, precondition.val);
+		std::sort(std::begin(preconditions), std::end(preconditions));
+		auto black_conditional_effects_preconditions = std::vector<std::pair<FactPair, std::vector<FactPair>>>();
+		for (const auto effect : op.get_black_effects()) {
+			assert(std::none_of(std::begin(op.get_black_preconditions()), std::end(op.get_black_preconditions()), [effect](const auto precondition) {
+				return precondition->var == effect->var && precondition->val == effect->val;
+			}));
+			assert(effect->conditions.empty());
+
+			if (std::any_of(std::begin(op.get_black_preconditions()), std::end(op.get_black_preconditions()), [effect](const auto precondition) {
+				return precondition->var == effect->var;
+			})) {
+				// there is a precondition on the same variable, so the black variable would always change when applying this action
+				changes_black_variable = true;
+				break;
+			} else {
+				// the variable may not change if the effect is already contained in the state
+				preconditions.emplace_back(effect->var, effect->val);
+			}
+		}
+		if (changes_black_variable)
+			continue;
+		std::sort(std::begin(preconditions) + op.get_base_operator().get_preconditions().size(), std::end(preconditions));
+		std::inplace_merge(std::begin(preconditions), std::begin(preconditions) + op.get_base_operator().get_preconditions().size(), std::end(preconditions));
+		assert(std::unique(std::begin(preconditions), std::end(preconditions)) == std::end(preconditions));
+		
+		// cache for the counter without additional conditional preconditions
+		const auto counter_pos = get_counter_pos_for_preconditions(preconditions);
+		for (const auto effect : op.get_red_effects()) {
+			assert(effect->conditions.empty());
+			add_effect(counters[counter_pos], effect->var, effect->val, op);
+		}
+	}
+	counters.shrink_to_fit();
+	for (auto var = 0; var < task.get_num_variables(); ++var)
+		for (auto val = 0; val < task.get_variable_domain_size(var); ++val)
+			precondition_of[var][val].shrink_to_fit();
 }
 
 RBStateRegistry::~RBStateRegistry() {}
@@ -61,80 +137,54 @@ auto state_buffer_sanity_check(const PackedStateBin *buffer, const RBIntPacker &
 
 void RBStateRegistry::saturate_state(PackedStateBin *buffer, bool store_best_supporters) const {
 	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
-	std::vector<std::vector<int>> lowest_cost(task.get_num_variables());
 
-	for (size_t var = 0; var < static_cast<size_t>(task.get_num_variables()); ++var) {
-		if (painting->is_red_var(var)) {
-			lowest_cost[var].resize(task.get_variable_domain_size(var), -1);
-			for (int val = 0; val < task.get_variable_domain_size(var); ++val)
+	if (store_best_supporters)
+		for (auto var = 0; var < task.get_num_variables(); ++var)
+			cached_best_supporters[var].assign(task.get_variable_domain_size(var), OperatorID(-1));
+
+	// no need to iterate over all facts if there are no counters anyway (e.g. if all variables are black)
+	if (counters.empty())
+		return;
+
+	// reset counter values
+	for (auto &counter : counters)
+		counter.value = counter.num_preconditions;
+
+	auto triggered = std::vector<Counter *>();
+	auto update_counters = [&triggered, this](auto var, auto val) {
+		for (auto counter_pos : precondition_of[var][val])
+			if (--counters[counter_pos].value == 0)
+				triggered.push_back(&counters[counter_pos]);
+	};
+
+	for (auto var = 0; var < task.get_num_variables(); ++var) {
+		if (painting->is_black_var(var)) {
+			update_counters(var, rb_state_packer().get(buffer, var));
+		} else {
+			for (auto val = 0; val < task.get_variable_domain_size(var); ++val) {
 				if (rb_state_packer().get_bit(buffer, var, val))
-					lowest_cost[var][val] = 0;
-			if (store_best_supporters)
-				std::vector<OperatorID>(task.get_variable_domain_size(var), OperatorID(-1)).swap(cached_best_supporters[var]);
+					update_counters(var, val);
+			}
 		}
 	}
 
-	bool change = true;
-	while (change) {
-		change = false;
-
-		std::vector<OperatorID> applicable_ops;
-		// Note: need to use a dummy id here
-		g_successor_generator->generate_applicable_ops(RBState(buffer, *this, StateID(0), *painting, rb_state_packer()), applicable_ops, false);
-
-		for (auto op_id : applicable_ops) {
-			const auto &op = operators[op_id.get_index()];
-#ifndef NDEBUG
-			bool is_applicable = true;
-			for (auto const &pre : op.get_black_preconditions()) {
-				if (rb_state_packer().get(buffer, pre->var) != pre->val) {
-					is_applicable = false;
-					break;
-				}
-			}
-			assert(is_applicable);
-#endif
-			bool changes_black = false;
-			if (op.is_black()) {
-				const auto &black_effs = op.get_black_effects();
-				for (size_t eff = 0; eff < black_effs.size(); ++eff) {
-					int var = black_effs[eff]->var;
-					int val = black_effs[eff]->val;
-
-					if (val != rb_state_packer().get(buffer, var)) {
-						changes_black = true;
-						break;
-					}
-				}
-			}
-			if (!changes_black) {
-				int max_pre_cost = 0;
-				const auto &red_pre = op.get_red_preconditions();
-				for (size_t pre = 0; pre < red_pre.size(); ++pre) {
-					int var = red_pre[pre]->var;
-					int val = red_pre[pre]->val;
-
-					assert(lowest_cost[var][val] >= 0);
-					max_pre_cost = std::max(max_pre_cost, lowest_cost[var][val]);
-				}
-
-				max_pre_cost += task.get_operator_cost(op.get_id().get_index(), false); //get_adjusted_action_cost(*op, cost_type)
-
-				const auto &red_effs = op.get_red_effects();
-				for (size_t eff = 0; eff < red_effs.size(); ++eff) {
-					int var = red_effs[eff]->var;
-					int val = red_effs[eff]->val;
-					// TODO only need to check for cheaper paths when storing best supporters
-					if (lowest_cost[var][val] == -1 || max_pre_cost < lowest_cost[var][val]) {
-						rb_state_packer().set_bit(buffer, var, val);
-						lowest_cost[var][val] = max_pre_cost;
-						change = true;
-						if (store_best_supporters)
-							cached_best_supporters[var][val] = op.get_id();
-					}
+	while (!triggered.empty()) {
+		auto next_triggered = std::vector<Counter *>();
+		for (const auto counter : triggered) {
+			assert(counter->value == 0);
+			for (const auto &effect : counter->effects) {
+				assert(painting->is_red_var(effect.fact.var));
+				if (!rb_state_packer().get_bit(buffer, effect.fact.var, effect.fact.value)) {
+					rb_state_packer().set_bit(buffer, effect.fact.var, effect.fact.value);
+					if (store_best_supporters)
+						cached_best_supporters[effect.fact.var][effect.fact.value] = effect.supporter;
+					for (const auto counter_pos : precondition_of[effect.fact.var][effect.fact.value])
+						if (--counters[counter_pos].value == 0)
+							next_triggered.push_back(&counters[counter_pos]);
 				}
 			}
 		}
+		triggered = next_triggered;
 	}
 	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
 }
