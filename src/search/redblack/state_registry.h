@@ -28,8 +28,14 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 
 	// data structures and class members for the relaxed exploration
 	struct Counter {
-		Counter(int num_preconditions) :
-			effects(), num_preconditions(num_preconditions), value(0) {}
+		Counter(int num_preconditions,
+		        const std::vector<std::vector<FactPair>> &negative_preconditions,
+		        const std::vector<std::pair<FactPair, std::vector<FactPair>>> &condeff_preconditions) :
+			effects(),
+			num_preconditions(num_preconditions),
+			negative_preconditions(negative_preconditions),
+			condeff_preconditions(condeff_preconditions),
+			value(0) {}
 
 		struct Effect {
 			Effect(const FactPair &fact, const OperatorID &supporter) :
@@ -39,9 +45,10 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 			const OperatorID supporter;
 		};
 
-		// effect, achieving operator
 		std::vector<Effect> effects;
 		const int num_preconditions;
+		std::vector<std::vector<FactPair>> negative_preconditions;
+		std::vector<std::pair<FactPair, std::vector<FactPair>>> condeff_preconditions;
 		int value;
 	};
 

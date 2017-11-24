@@ -5,6 +5,7 @@
 
 #include "../tasks/cost_adapted_task.h"
 #include "../globals.h"
+#include <map>
 
 template<>
 auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::lookup_state(StateID) const -> redblack::RBState {
@@ -29,6 +30,48 @@ auto contains_mutex(const std::vector<FactPair> &facts) -> bool {
 	return false;
 }
 
+auto simplify_condeff_preconditions(const std::vector<FactPair> &preconditions,
+                                    std::vector<std::vector<FactPair>> negative_preconditions,
+                                    std::vector<std::pair<FactPair, std::vector<FactPair>>> condeff_preconditions)
+-> std::tuple<bool, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>> {
+	auto change = true;
+	while (change) {
+		change = false;
+		for (auto &additional_condition : condeff_preconditions) {
+			assert(!additional_condition.second.empty());
+			assert(!std::binary_search(std::begin(preconditions), std::end(preconditions), additional_condition.first));
+			assert(std::none_of(std::begin(additional_condition.second), std::end(additional_condition.second), [&preconditions](const auto &precondition) {
+				return std::binary_search(std::begin(preconditions), std::end(preconditions), precondition);
+			}));
+			if (std::any_of(std::begin(preconditions), std::end(preconditions), [&additional_condition](const auto &precondition) {
+				return are_mutex(additional_condition.first, precondition);
+			})) {
+				// the effect can not occur in a state where the other preconditions are satisfied
+				// ==> the effect will always change the variable value so we need to prevent the conditional effect from triggering (via the negative preconditions)
+				negative_preconditions.emplace_back(std::move(additional_condition.second));
+				additional_condition.second.clear();
+				change = true;
+			}
+		}
+		condeff_preconditions.erase(
+			std::remove_if(std::begin(condeff_preconditions),
+				std::end(condeff_preconditions),
+				[](const auto &condition) { return condition.second.empty(); }),
+			std::end(condeff_preconditions));
+	}
+	for (auto &negative_disjunctive_precondition : negative_preconditions) {
+		negative_disjunctive_precondition.erase(
+			std::remove_if(std::begin(negative_disjunctive_precondition), std::end(negative_disjunctive_precondition),
+				[&preconditions](const auto &negative_precondition) { return std::binary_search(std::begin(preconditions), std::end(preconditions), negative_precondition); }),
+			std::end(negative_disjunctive_precondition));
+		if (negative_disjunctive_precondition.empty()) {
+			// deleted all disjunctive alternatives
+			return {false, {}, {}};
+		}
+	}
+	return {true, negative_preconditions, condeff_preconditions};
+}
+
 RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
 	                             AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data,
 	                             const std::vector<RBOperator> &operators, PackedStateBin *rb_initial_state_data)
@@ -47,13 +90,13 @@ RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &st
 	}
 	// initialize counters
 	assert(!any_conditional_effect_condition_is_red(*painting));
-	auto counter_for_preconditions = std::unordered_map<std::vector<FactPair>, std::size_t>();
-	auto get_counter_pos_for_preconditions = [&counter_for_preconditions, this](const auto &preconditions) {
-		auto [pos, inserted] = counter_for_preconditions.insert({preconditions, counters.size()});
+	auto counter_for_preconditions = std::map<std::tuple<std::vector<FactPair>, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>>, std::size_t>();
+	auto get_counter_pos_for_preconditions = [&counter_for_preconditions, this](const auto &preconditions, const auto &negative_preconditions, const auto &condeff_preconditions) {
+		auto [pos, inserted] = counter_for_preconditions.insert({{preconditions, negative_preconditions, condeff_preconditions }, counters.size()});
 		if (inserted) {
 			for (const auto &precondition : preconditions)
 				precondition_of[precondition.var][precondition.value].push_back(counters.size());
-			counters.emplace_back(preconditions.size());
+			counters.emplace_back(preconditions.size(), negative_preconditions, condeff_preconditions);
 		}
 		return pos->second;
 	};
@@ -67,42 +110,85 @@ RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &st
 			continue;
 		// 3 cases:
 		// a) doesn't modify black variables ==> fine
-		// b) conditionally modifies black variables ==> need negative preconditions that prevent these conditional effects from triggering
+		// b) conditionally modifies black variables ==> need negative preconditions that prevent these conditional effects from triggering, or the effect does nothing in the current state (add precondition)
 		// c) always modifies black variables ==> ignore this operator
 		auto changes_black_variable = false;
 		auto preconditions = std::vector<FactPair>();
 		for (const auto &precondition : op.get_base_operator().get_preconditions())
 			preconditions.emplace_back(precondition.var, precondition.val);
-		std::sort(std::begin(preconditions), std::end(preconditions));
-		auto black_conditional_effects_preconditions = std::vector<std::pair<FactPair, std::vector<FactPair>>>();
+		auto negative_preconditions = std::vector<std::vector<FactPair>>();
+		auto condeff_preconditions = std::vector<std::pair<FactPair, std::vector<FactPair>>>();
 		for (const auto effect : op.get_black_effects()) {
 			assert(std::none_of(std::begin(op.get_black_preconditions()), std::end(op.get_black_preconditions()), [effect](const auto precondition) {
 				return precondition->var == effect->var && precondition->val == effect->val;
 			}));
-			assert(effect->conditions.empty());
-
-			if (std::any_of(std::begin(op.get_black_preconditions()), std::end(op.get_black_preconditions()), [effect](const auto precondition) {
-				return precondition->var == effect->var;
-			})) {
-				// there is a precondition on the same variable, so the black variable would always change when applying this action
-				changes_black_variable = true;
-				break;
+			assert(std::none_of(std::begin(effect->conditions), std::end(effect->conditions), [effect](const auto &condition) {
+				return condition.var == effect->var && condition.val == effect->val;
+			}));
+			if (effect->conditions.empty()) {
+				// no conditional effect
+				if (std::any_of(std::begin(op.get_black_preconditions()), std::end(op.get_black_preconditions()), [effect](const auto precondition) {
+					return precondition->var == effect->var;
+				})) {
+					// there is a precondition on the same variable, so the black variable would always change when applying this action
+					changes_black_variable = true;
+					break;
+				} else {
+					// the variable may not change if the effect is already contained in the state
+					preconditions.emplace_back(effect->var, effect->val);
+				}
 			} else {
-				// the variable may not change if the effect is already contained in the state
-				preconditions.emplace_back(effect->var, effect->val);
+				auto conditions = std::vector<FactPair>();
+				auto condition_on_effect_variable = false;
+				for (const auto &condition : effect->conditions) {
+					conditions.emplace_back(condition.var, condition.val);
+					if (condition.var == effect->var) {
+						assert(condition.val != effect->val);
+						condition_on_effect_variable = true;
+					}
+				}
+				assert(!contains_mutex(conditions));
+				if (condition_on_effect_variable)
+					negative_preconditions.emplace_back(std::move(conditions));
+				else
+					condeff_preconditions.emplace_back(FactPair{effect->var, effect->val}, std::move(conditions));
 			}
 		}
 		if (changes_black_variable)
 			continue;
-		std::sort(std::begin(preconditions) + op.get_base_operator().get_preconditions().size(), std::end(preconditions));
-		std::inplace_merge(std::begin(preconditions), std::begin(preconditions) + op.get_base_operator().get_preconditions().size(), std::end(preconditions));
+		std::sort(std::begin(preconditions), std::end(preconditions));
 		assert(std::unique(std::begin(preconditions), std::end(preconditions)) == std::end(preconditions));
-		
+
+		// simplify black conditional effect preconditions
+		auto negative_preconditions_reachable = false;
+		std::tie(negative_preconditions_reachable, negative_preconditions, condeff_preconditions) =
+			simplify_condeff_preconditions(preconditions, negative_preconditions, condeff_preconditions);
+		if (!negative_preconditions_reachable)
+			continue;
+
+		// initialize counters
 		// cache for the counter without additional conditional preconditions
-		const auto counter_pos = get_counter_pos_for_preconditions(preconditions);
+		auto base_counter_pos = std::numeric_limits<std::size_t>::max();
 		for (const auto effect : op.get_red_effects()) {
-			assert(effect->conditions.empty());
-			add_effect(counters[counter_pos], effect->var, effect->val, op);
+			if (effect->conditions.empty()) {
+				if (base_counter_pos == std::numeric_limits<std::size_t>::max())
+					base_counter_pos = get_counter_pos_for_preconditions(preconditions, negative_preconditions, condeff_preconditions);
+				add_effect(counters[base_counter_pos], effect->var, effect->val, op);
+			} else {
+				auto this_effect_preconditions = std::vector<FactPair>();
+				this_effect_preconditions.reserve(preconditions.size() + effect->conditions.size());
+				this_effect_preconditions.insert(std::begin(this_effect_preconditions), std::begin(preconditions), std::end(preconditions));
+				for (const auto &condition : effect->conditions)
+					this_effect_preconditions.emplace_back(condition.var, condition.val);
+
+				auto [this_effect_negative_preconditions_reachable, this_effect_negative_preconditions, this_effect_condeff_preconditions] =
+					simplify_condeff_preconditions(this_effect_preconditions, negative_preconditions, condeff_preconditions);
+				if (!this_effect_negative_preconditions_reachable)
+					continue;
+
+				const auto counter_pos = get_counter_pos_for_preconditions(this_effect_preconditions, this_effect_negative_preconditions, this_effect_condeff_preconditions);
+				add_effect(counters[counter_pos], effect->var, effect->val, op);
+			}
 		}
 	}
 	counters.shrink_to_fit();
@@ -146,11 +232,30 @@ void RBStateRegistry::saturate_state(PackedStateBin *buffer, bool store_best_sup
 	if (counters.empty())
 		return;
 
-	// reset counter values
-	for (auto &counter : counters)
-		counter.value = counter.num_preconditions;
-
 	auto triggered = std::vector<Counter *>();
+
+	// reset counter values
+	for (auto &counter : counters) {
+		counter.value = counter.num_preconditions;
+		if (!std::all_of(std::begin(counter.negative_preconditions), std::end(counter.negative_preconditions), [this, buffer](const auto &negative_disjunctive_precondition) {
+			return std::any_of(std::begin(negative_disjunctive_precondition), std::end(negative_disjunctive_precondition), [this, buffer](const auto &precondition) {
+				assert(painting->is_black_var(precondition.var));
+				return rb_state_packer().get(buffer, precondition.var) != precondition.value;
+			});
+		}) || !std::all_of(std::begin(counter.condeff_preconditions), std::end(counter.condeff_preconditions), [this, buffer](const auto &condeff_precondition) {
+			assert(painting->is_black_var(condeff_precondition.first.var));
+			return rb_state_packer().get(buffer, condeff_precondition.first.var) == condeff_precondition.first.value
+				|| std::any_of(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [this, buffer](const auto &precondition) {
+				assert(painting->is_black_var(precondition.var));
+				return rb_state_packer().get(buffer, precondition.var) != precondition.value;
+			});
+		}))
+			// black conditional effects will change black variables, make counter unreachable
+			++counter.value;
+		if (counter.value == 0)
+			triggered.push_back(&counter);
+	}
+
 	auto update_counters = [&triggered, this](auto var, auto val) {
 		for (auto counter_pos : precondition_of[var][val])
 			if (--counters[counter_pos].value == 0)
@@ -172,6 +277,18 @@ void RBStateRegistry::saturate_state(PackedStateBin *buffer, bool store_best_sup
 		auto next_triggered = std::vector<Counter *>();
 		for (const auto counter : triggered) {
 			assert(counter->value == 0);
+			// for each effect, the supporting operator may not trigger any black effects (unless the black effect doesn't do anything on the current state)
+			assert(std::all_of(std::begin(counter->effects), std::end(counter->effects), [this, buffer](const auto &effect) {
+				const auto &black_effects = operators[effect.supporter.get_index()].get_black_effects();
+				return std::all_of(std::begin(black_effects), std::end(black_effects), [this, buffer](const auto black_effect) {
+					assert(painting->is_black_var(black_effect->var));
+					return rb_state_packer().get(buffer, black_effect->var) == black_effect->val
+						|| !std::all_of(std::begin(black_effect->conditions), std::end(black_effect->conditions), [this, buffer](const auto &condition) {
+						assert(painting->is_black_var(condition.var));
+						return rb_state_packer().get(buffer, condition.var) == condition.val;
+					});
+				});
+			}));
 			for (const auto &effect : counter->effects) {
 				assert(painting->is_red_var(effect.fact.var));
 				if (!rb_state_packer().get_bit(buffer, effect.fact.var, effect.fact.value)) {
