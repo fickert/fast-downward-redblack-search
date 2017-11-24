@@ -101,7 +101,7 @@ auto IncrementalRedBlackSearch::get_rb_search_options(const options::Options &op
 }
 
 void IncrementalRedBlackSearch::add_options_to_parser(options::OptionParser &parser) {
-	parser.add_option<std::shared_ptr<Painting>>("base_painting", "painting to be used in the initial red-black search", "cg_top_first()");
+	parser.add_option<std::shared_ptr<Painting>>("base_painting", "painting to be used in the initial red-black search", "all_red()");
 	parser.add_option<Heuristic<RBState, RBOperator> *>("heuristic", "red-black heuristic that will be passed to the underlying red-black search engine", "ff_rb(transform=adapt_costs(cost_type=1))");
 	parser.add_option<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy", "strategy for painting more variables black after finding a red-black solution with conflicts", "least_conflicts()");
 	parser.add_option<bool>("continue_from_first_conflict", "Continue next iteration of red-black search from the first conflicting state in the previous red-black plan.", "true");
