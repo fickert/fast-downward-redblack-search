@@ -30,27 +30,38 @@ auto contains_mutex(const std::vector<FactPair> &facts) -> bool {
 	return false;
 }
 
-auto simplify_condeff_preconditions(const std::vector<FactPair> &preconditions,
+auto simplify_condeff_preconditions(std::vector<FactPair> preconditions,
                                     std::vector<std::vector<FactPair>> negative_preconditions,
                                     std::vector<std::pair<FactPair, std::vector<FactPair>>> condeff_preconditions)
--> std::tuple<bool, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>> {
+-> std::tuple<bool, std::vector<FactPair>, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>> {
 	auto change = true;
 	while (change) {
 		change = false;
-		for (auto &additional_condition : condeff_preconditions) {
-			assert(!additional_condition.second.empty());
-			assert(!std::binary_search(std::begin(preconditions), std::end(preconditions), additional_condition.first));
-			assert(std::none_of(std::begin(additional_condition.second), std::end(additional_condition.second), [&preconditions](const auto &precondition) {
+		for (auto &condeff_precondition : condeff_preconditions) {
+			assert(!condeff_precondition.second.empty());
+			assert(!std::binary_search(std::begin(preconditions), std::end(preconditions), condeff_precondition.first));
+			assert(std::none_of(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [&preconditions](const auto &precondition) {
 				return std::binary_search(std::begin(preconditions), std::end(preconditions), precondition);
 			}));
-			if (std::any_of(std::begin(preconditions), std::end(preconditions), [&additional_condition](const auto &precondition) {
-				return are_mutex(additional_condition.first, precondition);
+			if (std::any_of(std::begin(preconditions), std::end(preconditions), [&condeff_precondition](const auto &precondition) {
+				return are_mutex(condeff_precondition.first, precondition);
 			})) {
 				// the effect can not occur in a state where the other preconditions are satisfied
 				// ==> the effect will always change the variable value so we need to prevent the conditional effect from triggering (via the negative preconditions)
-				negative_preconditions.emplace_back(std::move(additional_condition.second));
-				additional_condition.second.clear();
+				negative_preconditions.emplace_back(std::move(condeff_precondition.second));
+				condeff_precondition.second.clear();
 				change = true;
+			}
+			if (!condeff_precondition.second.empty()) {
+				condeff_precondition.second.erase(std::remove_if(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [&preconditions](const auto &negative_precondition) {
+					return std::binary_search(std::begin(preconditions), std::end(preconditions), negative_precondition);
+				}), std::end(condeff_precondition.second));
+				if (condeff_precondition.second.empty()) {
+					preconditions.emplace_back(std::move(condeff_precondition.first));
+					std::inplace_merge(std::begin(preconditions), std::end(preconditions) - 1, std::end(preconditions));
+					assert(std::unique(std::begin(preconditions), std::end(preconditions)) == std::end(preconditions));
+					change = true;
+				}
 			}
 		}
 		condeff_preconditions.erase(
@@ -66,10 +77,10 @@ auto simplify_condeff_preconditions(const std::vector<FactPair> &preconditions,
 			std::end(negative_disjunctive_precondition));
 		if (negative_disjunctive_precondition.empty()) {
 			// deleted all disjunctive alternatives
-			return {false, {}, {}};
+			return {false, {}, {}, {}};
 		}
 	}
-	return {true, negative_preconditions, condeff_preconditions};
+	return {true, preconditions, negative_preconditions, condeff_preconditions};
 }
 
 RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
@@ -159,12 +170,14 @@ RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &st
 		std::sort(std::begin(preconditions), std::end(preconditions));
 		assert(std::unique(std::begin(preconditions), std::end(preconditions)) == std::end(preconditions));
 
-		// simplify black conditional effect preconditions
-		auto negative_preconditions_reachable = false;
-		std::tie(negative_preconditions_reachable, negative_preconditions, condeff_preconditions) =
-			simplify_condeff_preconditions(preconditions, negative_preconditions, condeff_preconditions);
-		if (!negative_preconditions_reachable)
-			continue;
+		if (!negative_preconditions.empty() || !condeff_preconditions.empty()) {
+			// simplify black conditional effect preconditions
+			auto negative_preconditions_reachable = false;
+			std::tie(negative_preconditions_reachable, preconditions, negative_preconditions, condeff_preconditions) =
+				simplify_condeff_preconditions(preconditions, negative_preconditions, condeff_preconditions);
+			if (!negative_preconditions_reachable)
+				continue;
+		}
 
 		// initialize counters
 		// cache for the counter without additional conditional preconditions
@@ -181,12 +194,12 @@ RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &st
 				for (const auto &condition : effect->conditions)
 					this_effect_preconditions.emplace_back(condition.var, condition.val);
 
-				auto [this_effect_negative_preconditions_reachable, this_effect_negative_preconditions, this_effect_condeff_preconditions] =
+				auto [this_effect_negative_preconditions_reachable, this_effect_simplified_preconditions, this_effect_negative_preconditions, this_effect_condeff_preconditions] =
 					simplify_condeff_preconditions(this_effect_preconditions, negative_preconditions, condeff_preconditions);
 				if (!this_effect_negative_preconditions_reachable)
 					continue;
 
-				const auto counter_pos = get_counter_pos_for_preconditions(this_effect_preconditions, this_effect_negative_preconditions, this_effect_condeff_preconditions);
+				const auto counter_pos = get_counter_pos_for_preconditions(this_effect_simplified_preconditions, this_effect_negative_preconditions, this_effect_condeff_preconditions);
 				add_effect(counters[counter_pos], effect->var, effect->val, op);
 			}
 		}
