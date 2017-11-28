@@ -320,14 +320,20 @@ void verify_no_axioms() {
 }
 
 static int get_first_conditional_effects_op_id() {
+    static auto first_conditional_effect_op_id = -2;
+    if (first_conditional_effect_op_id != -2)
+        return first_conditional_effect_op_id;
     for (size_t i = 0; i < g_operators.size(); ++i) {
         const vector<GlobalEffect> &effects = g_operators[i].get_effects();
         for (size_t j = 0; j < effects.size(); ++j) {
             const vector<GlobalCondition> &cond = effects[j].conditions;
-            if (!cond.empty())
+            if (!cond.empty()) {
+                first_conditional_effect_op_id = i;
                 return i;
+            }
         }
     }
+    first_conditional_effect_op_id = -1;
     return -1;
 }
 
