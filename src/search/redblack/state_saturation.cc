@@ -13,67 +13,6 @@ namespace redblack {
 StateSaturation::StateSaturation(const AbstractTask &task, const RBIntPacker &state_packer, const std::vector<RBOperator> &operators)
 	: task(task), state_packer(state_packer), operators(operators) {}
 
-auto contains_mutex(const std::vector<FactPair> &facts) -> bool {
-	for (std::size_t i = 0; i < facts.size(); ++i)
-		for (std::size_t j = i + 1; j < facts.size(); ++j)
-			if (are_mutex(facts[i], facts[j]))
-				return true;
-	return false;
-}
-
-auto simplify_condeff_preconditions(std::vector<FactPair> preconditions,
-                                    std::vector<std::vector<FactPair>> negative_preconditions,
-                                    std::vector<std::pair<FactPair, std::vector<FactPair>>> condeff_preconditions)
--> std::tuple<bool, std::vector<FactPair>, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>> {
-	auto change = true;
-	while (change) {
-		change = false;
-		for (auto &condeff_precondition : condeff_preconditions) {
-			assert(!condeff_precondition.second.empty());
-			assert(!std::binary_search(std::begin(preconditions), std::end(preconditions), condeff_precondition.first));
-			assert(std::none_of(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [&preconditions](const auto &precondition) {
-				return std::binary_search(std::begin(preconditions), std::end(preconditions), precondition);
-			}));
-			if (std::any_of(std::begin(preconditions), std::end(preconditions), [&condeff_precondition](const auto &precondition) {
-				return are_mutex(condeff_precondition.first, precondition);
-			})) {
-				// the effect can not occur in a state where the other preconditions are satisfied
-				// ==> the effect will always change the variable value so we need to prevent the conditional effect from triggering (via the negative preconditions)
-				negative_preconditions.emplace_back(std::move(condeff_precondition.second));
-				condeff_precondition.second.clear();
-				change = true;
-			}
-			if (!condeff_precondition.second.empty()) {
-				condeff_precondition.second.erase(std::remove_if(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [&preconditions](const auto &negative_precondition) {
-					return std::binary_search(std::begin(preconditions), std::end(preconditions), negative_precondition);
-				}), std::end(condeff_precondition.second));
-				if (condeff_precondition.second.empty()) {
-					preconditions.emplace_back(std::move(condeff_precondition.first));
-					std::inplace_merge(std::begin(preconditions), std::end(preconditions) - 1, std::end(preconditions));
-					assert(std::unique(std::begin(preconditions), std::end(preconditions)) == std::end(preconditions));
-					change = true;
-				}
-			}
-		}
-		condeff_preconditions.erase(
-			std::remove_if(std::begin(condeff_preconditions),
-				std::end(condeff_preconditions),
-				[](const auto &condition) { return condition.second.empty(); }),
-			std::end(condeff_preconditions));
-	}
-	for (auto &negative_disjunctive_precondition : negative_preconditions) {
-		negative_disjunctive_precondition.erase(
-			std::remove_if(std::begin(negative_disjunctive_precondition), std::end(negative_disjunctive_precondition),
-				[&preconditions](const auto &negative_precondition) { return std::binary_search(std::begin(preconditions), std::end(preconditions), negative_precondition); }),
-			std::end(negative_disjunctive_precondition));
-		if (negative_disjunctive_precondition.empty()) {
-			// deleted all disjunctive alternatives
-			return {false, {}, {}, {}};
-		}
-	}
-	return {true, preconditions, negative_preconditions, condeff_preconditions};
-}
-
 template<>
 CounterBasedStateSaturation<false>::CounterBasedStateSaturation(const AbstractTask &task, const RBIntPacker &state_packer, const std::vector<RBOperator> &operators)
 	: StateSaturation(task, state_packer, operators), counters(), precondition_of(task.get_num_variables()) {
@@ -142,6 +81,80 @@ CounterBasedStateSaturation<false>::CounterBasedStateSaturation(const AbstractTa
 			precondition_of[var][val].shrink_to_fit();
 }
 
+auto contains_mutex(const std::vector<FactPair> &facts) -> bool {
+	for (std::size_t i = 0; i < facts.size(); ++i)
+		for (std::size_t j = i + 1; j < facts.size(); ++j)
+			if (are_mutex(facts[i], facts[j]))
+				return true;
+	return false;
+}
+
+auto simplify_condeff_preconditions(std::vector<FactPair> preconditions,
+                                    std::vector<std::vector<FactPair>> negative_preconditions,
+                                    std::vector<std::pair<FactPair, std::vector<FactPair>>> condeff_preconditions)
+-> std::tuple<bool, std::vector<FactPair>, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>> {
+	auto change = true;
+	while (change) {
+		change = false;
+		for (auto &condeff_precondition : condeff_preconditions) {
+			assert(std::is_sorted(std::begin(condeff_precondition.second), std::end(condeff_precondition.second)));
+			assert(!condeff_precondition.second.empty());
+			assert(!std::binary_search(std::begin(preconditions), std::end(preconditions), condeff_precondition.first));
+			assert(std::none_of(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [&preconditions](const auto &precondition) {
+				return std::binary_search(std::begin(preconditions), std::end(preconditions), precondition);
+			}));
+			if (std::any_of(std::begin(preconditions), std::end(preconditions), [&condeff_precondition](const auto &precondition) {
+				return are_mutex(condeff_precondition.first, precondition);
+			})) {
+				// the effect can not occur in a state where the other preconditions are satisfied
+				// ==> the effect will always change the variable value so we need to prevent the conditional effect from triggering (via the negative preconditions)
+				negative_preconditions.emplace_back(std::move(condeff_precondition.second));
+				condeff_precondition.second.clear();
+				change = true;
+			}
+			if (!condeff_precondition.second.empty()) {
+				condeff_precondition.second.erase(std::remove_if(std::begin(condeff_precondition.second), std::end(condeff_precondition.second), [&preconditions](const auto &negative_precondition) {
+					return std::binary_search(std::begin(preconditions), std::end(preconditions), negative_precondition);
+				}), std::end(condeff_precondition.second));
+				if (condeff_precondition.second.empty()) {
+					// negative preconditions are unreachable ==> the conditional effect will always trigger, so we have to make sure that it doesn't change the value of the variable
+					preconditions.emplace_back(std::move(condeff_precondition.first));
+					std::inplace_merge(std::begin(preconditions), std::end(preconditions) - 1, std::end(preconditions));
+					assert(std::unique(std::begin(preconditions), std::end(preconditions)) == std::end(preconditions));
+					change = true;
+				}
+			}
+		}
+		condeff_preconditions.erase(
+			std::remove_if(std::begin(condeff_preconditions),
+				std::end(condeff_preconditions),
+				[](const auto &condition) { return condition.second.empty(); }),
+			std::end(condeff_preconditions));
+	}
+	for (auto &negative_disjunctive_precondition : negative_preconditions) {
+		std::sort(std::begin(negative_disjunctive_precondition), std::end(negative_disjunctive_precondition));
+		negative_disjunctive_precondition.erase(
+			std::remove_if(std::begin(negative_disjunctive_precondition), std::end(negative_disjunctive_precondition),
+				[&preconditions](const auto &negative_precondition) { return std::binary_search(std::begin(preconditions), std::end(preconditions), negative_precondition); }),
+			std::end(negative_disjunctive_precondition));
+		if (negative_disjunctive_precondition.empty()) {
+			// deleted all disjunctive alternatives
+			return {false, {}, {}, {}};
+		}
+	}
+	std::sort(std::begin(negative_preconditions), std::end(negative_preconditions));
+	negative_preconditions.erase(std::unique(std::begin(negative_preconditions), std::end(negative_preconditions)), std::end(negative_preconditions));
+	condeff_preconditions.erase(
+		std::remove_if(std::begin(condeff_preconditions),
+			std::end(condeff_preconditions),
+			[&negative_preconditions](const auto &condition) {
+				assert(std::is_sorted(std::begin(condition.second), std::end(condition.second)));
+				return std::binary_search(std::begin(negative_preconditions), std::end(negative_preconditions), condition.second);
+			}),
+		std::end(condeff_preconditions));
+	return {true, preconditions, negative_preconditions, condeff_preconditions};
+}
+
 template<>
 CounterBasedStateSaturation<true>::CounterBasedStateSaturation(const AbstractTask &task, const RBIntPacker &state_packer, const std::vector<RBOperator> &operators)
 	: StateSaturation(task, state_packer, operators), counters(), precondition_of(task.get_num_variables()) {
@@ -205,10 +218,11 @@ CounterBasedStateSaturation<true>::CounterBasedStateSaturation(const AbstractTas
 					}
 				}
 				assert(!contains_mutex(conditions));
+				std::sort(std::begin(conditions), std::end(conditions));
 				if (condition_on_effect_variable)
 					negative_preconditions.emplace_back(std::move(conditions));
 				else
-					condeff_preconditions.emplace_back(FactPair{ effect->var, effect->val }, std::move(conditions));
+					condeff_preconditions.emplace_back(FactPair{effect->var, effect->val}, std::move(conditions));
 			}
 		}
 		if (changes_black_variable)
