@@ -729,6 +729,7 @@ fast_downward_plugin(
         redblack/search_space
         redblack/state
         redblack/state_registry
+        redblack/state_saturation
         redblack/util
     DEPENDS BOOST SCCS LAZY_SEARCH FF_HEURISTIC
 )
