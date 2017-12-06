@@ -24,7 +24,8 @@ void AdditiveHeuristic<redblack::RBState, redblack::RBOperator>::setup_explorati
 template<>
 template<>
 auto AdditiveHeuristic<redblack::RBState, redblack::RBOperator>::is_operator_applicable(const redblack::RBState &state, int operator_no) -> bool {
-	return state.get_rb_state_registry().get_operators()[operator_no].is_applicable(state);
+	const auto &op = state.get_rb_state_registry().get_operators()[operator_no];
+	return op.is_black() && op.is_applicable(state);
 }
 
 template<>
