@@ -723,6 +723,7 @@ fast_downward_plugin(
         redblack/painting
         redblack/painting_utils
         redblack/plugins
+        redblack/rb_data
         redblack/rb_ff_heuristic
         redblack/rb_lazy_search
         redblack/rb_search_engine

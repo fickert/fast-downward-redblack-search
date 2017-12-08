@@ -5,6 +5,7 @@
 #include "util.h"
 #include "../search_engines/lazy_search.h"
 #include "operator.h"
+#include "rb_data.h"
 
 
 #ifdef _MSC_VER
@@ -41,21 +42,6 @@ protected:
 	void set_solution(const Plan &partial_plan, const GlobalState &state);
 
 	void print_statistics() const override;
-
-	struct RBData {
-		Painting painting;
-		RBIntPacker int_packer;
-
-		RBData(const Painting &painting)
-			: painting(painting),
-			  int_packer(this->painting) {
-			int_packer.initialize(g_variable_domain);
-		}
-
-		auto construct_state_registry(const std::vector<int> &initial_state_data) const -> std::unique_ptr<RBStateRegistry> {
-			return std::make_unique<RBStateRegistry>(*g_root_task(), int_packer, *g_axiom_evaluator, initial_state_data);
-		}
-	};
 
 	struct IncrementalRedBlackSearchStatistics {
 		IncrementalRedBlackSearchStatistics()
