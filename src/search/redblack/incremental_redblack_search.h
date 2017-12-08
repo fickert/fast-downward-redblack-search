@@ -45,19 +45,15 @@ protected:
 	struct RBData {
 		Painting painting;
 		RBIntPacker int_packer;
-		std::vector<RBOperator> operators;
-
-		static auto construct_redblack_operators(const Painting &painting) -> std::vector<RBOperator>;
 
 		RBData(const Painting &painting)
 			: painting(painting),
-			  int_packer(this->painting),
-			  operators(construct_redblack_operators(this->painting)) {
+			  int_packer(this->painting) {
 			int_packer.initialize(g_variable_domain);
 		}
 
 		auto construct_state_registry(const std::vector<int> &initial_state_data) const -> std::unique_ptr<RBStateRegistry> {
-			return std::make_unique<RBStateRegistry>(*g_root_task(), int_packer, *g_axiom_evaluator, initial_state_data, operators);
+			return std::make_unique<RBStateRegistry>(*g_root_task(), int_packer, *g_axiom_evaluator, initial_state_data);
 		}
 	};
 

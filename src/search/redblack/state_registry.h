@@ -14,9 +14,8 @@ class StateSaturation;
 
 class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 	const Painting *painting;
-
-	std::vector<std::vector<OperatorID>> initial_state_best_supporters;
 	const std::vector<RBOperator> operators;
+	std::vector<std::vector<OperatorID>> initial_state_best_supporters;
 
 	auto rb_state_packer() const -> const RBIntPacker & {
 		return static_cast<const RBIntPacker &>(state_packer);
@@ -26,10 +25,12 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 
 	std::unique_ptr<StateSaturation> state_saturation;
 
+	static auto construct_redblack_operators(const Painting &painting)->std::vector<RBOperator>;
+
 public:
 	RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
 	                AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data,
-	                const std::vector<RBOperator> &operators, PackedStateBin *rb_initial_state_data = nullptr);
+	                PackedStateBin *rb_initial_state_data = nullptr);
 	~RBStateRegistry();
 
 	auto get_initial_state_best_supporters() const -> const std::vector<std::vector<OperatorID>> & {

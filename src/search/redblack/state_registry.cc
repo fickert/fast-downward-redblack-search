@@ -30,13 +30,23 @@ auto get_state_saturation(const AbstractTask &task, const RBIntPacker &state_pac
 	return std::make_unique<CounterBasedStateSaturation<false>>(task, state_packer, operators);
 }
 
+auto construct_redblack_operators(const Painting &painting) -> std::vector<RBOperator> {
+	auto rb_operators = std::vector<RBOperator>();
+	rb_operators.reserve(g_operators.size());
+	for (const auto &op : g_operators) {
+		rb_operators.emplace_back(op);
+		rb_operators.back().apply_painting(painting);
+	}
+	return rb_operators;
+}
+
 RBStateRegistry::RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
 	                             AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data,
-	                             const std::vector<RBOperator> &operators, PackedStateBin *rb_initial_state_data)
+	                             PackedStateBin *rb_initial_state_data)
 	: StateRegistryBase<RBState, RBOperator>(task, state_packer, axiom_evaluator, initial_state_data),
 	  painting(&state_packer.get_painting()),
+	  operators(construct_redblack_operators(*painting)),
 	  initial_state_best_supporters(),
-	  operators(operators),
 	  state_saturation(get_state_saturation(task, state_packer, this->operators)) {
 	if (rb_initial_state_data) {
 		// TODO: make sure the passed initial state data matches the painting

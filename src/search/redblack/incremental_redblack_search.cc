@@ -86,16 +86,6 @@ void IncrementalRedBlackSearch::set_solution(const Plan &partial_plan, const Glo
 	set_plan(solution);
 }
 
-auto IncrementalRedBlackSearch::RBData::construct_redblack_operators(const Painting &painting) -> std::vector<RBOperator> {
-	auto rb_operators = std::vector<RBOperator>();
-	rb_operators.reserve(g_operators.size());
-	for (const auto &op : g_operators) {
-		rb_operators.emplace_back(op);
-		rb_operators.back().apply_painting(painting);
-	}
-	return rb_operators;
-}
-
 auto IncrementalRedBlackSearch::get_rb_search_options(const options::Options &opts) -> options::Options {
 	auto rb_search_options = opts;
 	rb_search_options.set("evals", std::vector<Evaluator<RBState, RBOperator> *>{ opts.get<Heuristic<RBState, RBOperator> *>("heuristic") });
