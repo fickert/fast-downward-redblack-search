@@ -162,7 +162,7 @@ CounterBasedStateSaturation<true>::CounterBasedStateSaturation(const AbstractTas
 	assert(!any_conditional_effect_condition_is_red(state_packer.get_painting()));
 	auto counter_for_preconditions = std::map<std::tuple<std::vector<FactPair>, std::vector<std::vector<FactPair>>, std::vector<std::pair<FactPair, std::vector<FactPair>>>>, std::size_t>();
 	auto get_counter_pos_for_preconditions = [&counter_for_preconditions, this](const auto &preconditions, const auto &negative_preconditions, const auto &condeff_preconditions) {
-		auto[pos, inserted] = counter_for_preconditions.insert({{preconditions, negative_preconditions, condeff_preconditions}, counters.size()});
+		auto [pos, inserted] = counter_for_preconditions.insert({{preconditions, negative_preconditions, condeff_preconditions}, counters.size()});
 		if (inserted) {
 			for (const auto &precondition : preconditions)
 				precondition_of[precondition.var][precondition.value].push_back(counters.size());
@@ -254,7 +254,7 @@ CounterBasedStateSaturation<true>::CounterBasedStateSaturation(const AbstractTas
 				for (const auto &condition : effect->conditions)
 					this_effect_preconditions.emplace_back(condition.var, condition.val);
 
-				auto[this_effect_negative_preconditions_reachable, this_effect_simplified_preconditions, this_effect_negative_preconditions, this_effect_condeff_preconditions] =
+				auto [this_effect_negative_preconditions_reachable, this_effect_simplified_preconditions, this_effect_negative_preconditions, this_effect_condeff_preconditions] =
 					simplify_condeff_preconditions(this_effect_preconditions, negative_preconditions, condeff_preconditions);
 				if (!this_effect_negative_preconditions_reachable)
 					continue;
@@ -356,7 +356,7 @@ auto CounterBasedStateSaturation<support_conditional_effects>::saturate_state(Pa
 				}
 			}
 		}
-		triggered = next_triggered;
+		triggered = std::move(next_triggered);
 	}
 
 	return best_supporters;
