@@ -59,7 +59,6 @@ HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &o
 	// 	<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)..." << std::endl;
 	// std::cout << "Painting " << static_cast<RBStateRegistry *>(this->state_registry.get())->get_painting() << std::endl;
 	// std::cout << "This search is: " << this << std::endl;
-	verify_black_variable_values(current_state, this->current_initial_state);
 }
 
 
@@ -100,6 +99,8 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 		auto &child_search = *child_searches.at(current_state.get_id()).back();
 		std::tie(child_search.current_state, child_search.current_best_supporters) = std::get<1>(rb_search_space_it->second)->get_state_and_best_supporters(initial_state.get_values());
 		child_search.current_eval_context = EvaluationContext<RBState, RBOperator>(child_search.current_state, 0, true, &child_search.statistics);
+		child_search.corresponding_global_state.clear();
+		child_search.corresponding_global_state.insert({child_search.current_state.get_id(), initial_state.get_id()});
 	}
 	assert(!child_searches.at(current_state.get_id()).empty());
 	open_list->insert(new_eval_context, {current_state.get_id(), -static_cast<int>(child_searches.at(current_state.get_id()).size() - 1) - 1});
@@ -125,7 +126,6 @@ SearchStatus HierarchicalRedBlackSearch::step() {
 
 	if (current_child_search) {
 		assert(*current_child_search);
-		assert((**current_child_search).get_status() == IN_PROGRESS);
 		auto result = (**current_child_search).step();
 		switch (result) {
 		case SOLVED:
@@ -305,7 +305,6 @@ SearchStatus HierarchicalRedBlackSearch::fetch_next_state() {
 		if (!*current_child_search)
 			// this open list entry was already handled (this can happen e.g. with the alternating queue, where entries are inserted in two different queues)
 			return fetch_next_state();
-		assert((**current_child_search).get_status() == IN_PROGRESS);
 		current_operator = nullptr;
 		// the members set below are probably not relevant for the child search case
 		current_state = state_registry->lookup_state(current_predecessor_id);
@@ -382,7 +381,6 @@ auto HierarchicalRedBlackSearch::get_current_key() const -> int {
 }
 
 auto HierarchicalRedBlackSearch::get_goal_state() const -> StateID {
-	assert(get_status() == SOLVED);
 	assert(global_goal_state != StateID::no_state);
 	return global_goal_state;
 }
