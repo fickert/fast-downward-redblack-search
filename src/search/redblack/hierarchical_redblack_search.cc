@@ -300,7 +300,7 @@ SearchStatus HierarchicalRedBlackSearch::fetch_next_state() {
 	if (next.second < 0) {
 		assert(child_searches.find(current_predecessor_id) != std::end(child_searches));
 		current_child_search_index = -next.second - 1;
-		assert(child_searches.find(current_predecessor_id)->second.size() > current_child_search_index);
+		assert(static_cast<int>(child_searches.find(current_predecessor_id)->second.size()) > current_child_search_index);
 		current_child_search = &child_searches.find(current_predecessor_id)->second[current_child_search_index];
 		if (!*current_child_search)
 			// this open list entry was already handled (this can happen e.g. with the alternating queue, where entries are inserted in two different queues)

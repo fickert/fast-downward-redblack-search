@@ -131,7 +131,7 @@ auto RBStateRegistry::get_successor_state(const RBState &predecessor, const RBOp
 	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
 	axiom_evaluator.evaluate(buffer, state_packer);
 	auto id = insert_id_or_pop_state();
-	assert(lookup_state(id).get_painting().get_painting().size() == g_root_task()->get_num_variables());
+	assert(static_cast<int>(lookup_state(id).get_painting().get_painting().size()) == g_root_task()->get_num_variables());
 	return {lookup_state(id), supporters};
 }
 
