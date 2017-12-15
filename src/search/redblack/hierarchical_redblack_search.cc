@@ -208,6 +208,12 @@ SearchStatus HierarchicalRedBlackSearch::step() {
 					auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, goal_facts);
 					if (is_plan) {
 						global_goal_state = resulting_state.get_id();
+						auto num_black = std::count_if(
+							std::begin(static_cast<RBStateRegistry *>(this->state_registry.get())->get_painting().get_painting()),
+							std::end(static_cast<RBStateRegistry *>(this->state_registry.get())->get_painting().get_painting()),
+							[](auto b) { return !b; });
+						std::cout << "Final painting has " << num_black << " black variables ("
+							<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 						return SOLVED;
 					}
 					// the goal is not reachable with a real plan, start a new search with a different painting from here and insert a corresponding node into the open list
