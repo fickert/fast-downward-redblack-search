@@ -30,6 +30,7 @@ public:
 	                           StateRegistryBase<GlobalState, GlobalOperator> &global_state_registry,
 	                           SearchSpace<GlobalState, GlobalOperator> &global_search_space,
 	                           std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
+	                           int num_black,
 	                           bool initial_state_is_preferred = true,
 	                           int initial_state_h_value = 0);
 
@@ -70,6 +71,7 @@ protected:
 	StateRegistryBase<GlobalState, GlobalOperator> &global_state_registry;
 	SearchSpace<GlobalState, GlobalOperator> &global_search_space;
 	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces;
+	const int num_black;
 
 	struct IncrementalRedBlackSearchStatistics {
 		IncrementalRedBlackSearchStatistics() {}
@@ -93,6 +95,7 @@ protected:
 
 	std::unique_ptr<HierarchicalRedBlackSearch> root_search_engine;
 	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> rb_search_spaces;
+	const int num_black;
 
 };
 }

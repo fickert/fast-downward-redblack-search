@@ -27,6 +27,7 @@ HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &o
                                                        StateRegistryBase<GlobalState, GlobalOperator> &global_state_registry,
                                                        SearchSpace<GlobalState, GlobalOperator> &global_search_space,
                                                        std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
+                                                       int num_black,
                                                        bool initial_state_is_preferred,
                                                        int initial_state_h_value)
 	: LazySearch<RBState, RBOperator>(opts, state_registry, search_space),
@@ -45,6 +46,7 @@ HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &o
 	  global_state_registry(global_state_registry),
 	  global_search_space(global_search_space),
 	  rb_search_spaces(rb_search_spaces),
+	  num_black(num_black),
 	  hierarchical_redblack_search_statistics() {
 	auto pref_operator_heuristics = search_options.get_list<Heuristic<RBState, RBOperator> *>("preferred");
 	set_pref_operator_heuristics(pref_operator_heuristics);
@@ -76,7 +78,7 @@ auto get_random_new_painting(const Painting &last_painting, int num_black) -> Pa
 	auto next_painting = last_painting.get_painting();
 	for (auto i = 0u; i < std::min<std::size_t>(red_variables.size(), num_black); ++i)
 		next_painting[red_variables[i]] = false;
-	return Painting(next_painting);
+	return get_no_red_conditional_effect_conditions_painting(Painting(next_painting));
 }
 
 void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, const GlobalState &initial_state, int key, bool preferred, EvaluationContext<RBState, RBOperator> &new_eval_context) {
@@ -93,7 +95,7 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 	assert(rb_search_space_it != std::end(rb_search_spaces));
 	child_searches[current_state.get_id()].emplace_back(std::make_unique<HierarchicalRedBlackSearch>(
 		search_options, std::get<1>(rb_search_space_it->second), std::get<2>(rb_search_space_it->second),
-		initial_state, global_state_registry, global_search_space, rb_search_spaces, preferred, key));
+		initial_state, global_state_registry, global_search_space, rb_search_spaces, num_black, preferred, key));
 	if (!painting_is_new) {
 		// state registry initial state doesn't match the actual initial state that should be used in the search
 		auto &child_search = *child_searches.at(current_state.get_id()).back();
@@ -139,7 +141,7 @@ SearchStatus HierarchicalRedBlackSearch::step() {
 				break;
 			}
 			// no plan to search conflicts in ...
-			auto new_painting = get_random_new_painting(painting, 1);
+			auto new_painting = get_random_new_painting(painting, num_black);
 			// insert this child search into the open list, using the current state's key as the new key as well
 			assert(*current_child_search);
 			auto new_eval_context = EvaluationContext<RBState, RBOperator>(get_hacked_cache_for_key(current_key), current_g, is_current_preferred, nullptr);
@@ -394,13 +396,14 @@ auto HierarchicalRedBlackSearch::get_goal_state() const -> StateID {
 HierarchicalRedBlackSearchWrapper::HierarchicalRedBlackSearchWrapper(const options::Options &opts)
 	: SearchEngine<GlobalState, GlobalOperator>(opts),
 	  root_search_engine(),
-	  rb_search_spaces() {
+	  rb_search_spaces(),
+	  num_black(get_num_black(opts, true)) {
 	auto rb_search_options = get_rb_search_options(opts);
 	auto root_rb_data = std::make_shared<RBData>(*opts.get<std::shared_ptr<Painting>>("base_painting"));
 	auto root_state_registry = std::shared_ptr<RBStateRegistry>(root_rb_data->construct_state_registry(g_initial_state_data));
 	auto root_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*root_state_registry, static_cast<OperatorCost>(rb_search_options.get_enum("cost_type")));
 	rb_search_spaces.insert({root_rb_data->painting.get_painting(), {root_rb_data, root_state_registry, root_search_space}});
-	root_search_engine = std::make_unique<HierarchicalRedBlackSearch>(rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(), *state_registry, *search_space, rb_search_spaces);
+	root_search_engine = std::make_unique<HierarchicalRedBlackSearch>(rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(), *state_registry, *search_space, rb_search_spaces, num_black);
 	auto initial_node = search_space->get_node(state_registry->get_initial_state());
 	initial_node.open_initial();
 	initial_node.close();
@@ -424,6 +427,7 @@ void HierarchicalRedBlackSearchWrapper::add_options_to_parser(options::OptionPar
 	parser.add_option<std::shared_ptr<Painting>>("base_painting", "painting to be used in the initial red-black search", "all_red()");
 	parser.add_option<Heuristic<RBState, RBOperator> *>("heuristic", "red-black heuristic that will be passed to the underlying red-black search engine", "ff_rb(transform=adapt_costs(cost_type=1))");
 	parser.add_option<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy", "strategy for painting more variables black after finding a red-black solution with conflicts", "least_conflicts()");
+	add_num_black_options(parser);
 	add_succ_order_options(parser);
 }
 
