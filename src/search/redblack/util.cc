@@ -59,10 +59,9 @@ auto get_no_red_conditional_effect_conditions_painting(const Painting &painting)
 auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts) -> std::vector<OperatorID> {
 	auto open = std::unordered_set<FactPair>();
 	for (const auto &goal_fact : goal_facts)
-		open.insert(goal_fact);
+		if (state[goal_fact.var] != goal_fact.value)
+			open.insert(goal_fact);
 	auto closed = std::unordered_set<FactPair>();
-	for (auto i = 0; i < g_root_task()->get_num_variables(); ++i)
-		closed.emplace(i, state[i]);
 	auto relaxed_plan = std::vector<OperatorID>();
 	while (!open.empty()) {
 		auto next_open = std::unordered_set<FactPair>();
