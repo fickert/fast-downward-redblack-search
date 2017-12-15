@@ -60,6 +60,9 @@ public:
     */
     virtual Entry remove_min(std::vector<int> *key = 0) = 0;
 
+    virtual auto get_min_key() const -> int;
+    virtual auto is_min_preferred() const -> bool;
+
     // Return true if the open list is empty.
     virtual bool empty() const = 0;
 
@@ -158,6 +161,18 @@ void OpenList<Entry, StateType, OperatorType>::insert(
         return;
     if (!is_dead_end(eval_context))
         do_insertion(eval_context, entry);
+}
+
+template <class Entry, class StateType, class OperatorType>
+auto OpenList<Entry, StateType, OperatorType>::get_min_key() const -> int {
+    std::cerr << "not implemented" << std::endl;
+    utils::exit_with(utils::ExitCode::UNSUPPORTED);
+}
+
+template <class Entry, class StateType, class OperatorType>
+auto OpenList<Entry, StateType, OperatorType>::is_min_preferred() const -> bool {
+    std::cerr << "not implemented" << std::endl;
+    utils::exit_with(utils::ExitCode::UNSUPPORTED);
 }
 
 template<class Entry, class StateType, class OperatorType>

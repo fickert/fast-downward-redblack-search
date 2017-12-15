@@ -20,6 +20,8 @@ public:
     virtual ~AlternationOpenList() override = default;
 
     virtual Entry remove_min(std::vector<int> *key = nullptr) override;
+    auto get_min_key() const -> int override;
+    auto is_min_preferred() const -> bool override;
     virtual bool empty() const override;
     virtual void clear() override;
     virtual void boost_preferred() override;
@@ -68,6 +70,36 @@ Entry AlternationOpenList<Entry, StateType, OperatorType>::remove_min(std::vecto
     assert(!best_list->empty());
     ++priorities[best];
     return best_list->remove_min(nullptr);
+}
+
+template<class Entry, class StateType, class OperatorType>
+auto AlternationOpenList<Entry, StateType, OperatorType>::get_min_key() const -> int {
+	int best = -1;
+	for (size_t i = 0; i < open_lists.size(); ++i) {
+		if (!open_lists[i]->empty() &&
+			(best == -1 || priorities[i] < priorities[best])) {
+			best = i;
+		}
+	}
+	assert(best != -1);
+	const auto &best_list = open_lists[best];
+	assert(!best_list->empty());
+	return best_list->get_min_key();
+}
+
+template<class Entry, class StateType, class OperatorType>
+auto AlternationOpenList<Entry, StateType, OperatorType>::is_min_preferred() const -> bool {
+	int best = -1;
+	for (size_t i = 0; i < open_lists.size(); ++i) {
+		if (!open_lists[i]->empty() &&
+			(best == -1 || priorities[i] < priorities[best])) {
+			best = i;
+		}
+	}
+	assert(best != -1);
+	const auto &best_list = open_lists[best];
+	assert(!best_list->empty());
+	return best_list->is_min_preferred();
 }
 
 template<class Entry, class StateType, class OperatorType>

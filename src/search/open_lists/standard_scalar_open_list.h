@@ -31,6 +31,8 @@ public:
     virtual ~StandardScalarOpenList() override = default;
 
     virtual Entry remove_min(std::vector<int> *key = nullptr) override;
+	auto get_min_key() const -> int override;
+	auto is_min_preferred() const -> bool override;
     virtual bool empty() const override;
     virtual void clear() override;
     virtual void get_involved_heuristics(std::set<Heuristic<StateType, OperatorType> *> &hset) override;
@@ -81,6 +83,20 @@ Entry StandardScalarOpenList<Entry, StateType, OperatorType>::remove_min(std::ve
         buckets.erase(it);
     --size;
     return result;
+}
+
+template<class Entry, class StateType, class OperatorType>
+auto StandardScalarOpenList<Entry, StateType, OperatorType>::get_min_key() const -> int {
+	assert(size > 0);
+	assert(!buckets.empty());
+	return buckets.begin()->first;
+}
+
+template<class Entry, class StateType, class OperatorType>
+auto StandardScalarOpenList<Entry, StateType, OperatorType>::is_min_preferred() const -> bool {
+	assert(size > 0);
+	assert(!buckets.empty());
+	return this->only_contains_preferred_entries();
 }
 
 template<class Entry, class StateType, class OperatorType>
