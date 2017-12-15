@@ -8,6 +8,8 @@
 
 #include "painting.h"
 #include "../operator_id.h"
+#include "../abstract_task.h"
+#include "../globals.h"
 
 
 namespace redblack {
@@ -20,7 +22,8 @@ protected:
 	const int num_black;
 
 public:
-	virtual auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting = 0;
+	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting;
+	virtual auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting = 0;
 
 	static void add_options_to_parser(options::OptionParser &parser);
 };
@@ -35,7 +38,7 @@ public:
 	LeastConflictsPaintingStrategy(const options::Options &opts);
 	~LeastConflictsPaintingStrategy() = default;
 
-	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting override;
+	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting override;
 };
 
 
@@ -46,7 +49,7 @@ public:
 	RandomPaintingStrategy(const options::Options &opts);
 	~RandomPaintingStrategy() = default;
 
-	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting override;
+	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting override;
 };
 
 }

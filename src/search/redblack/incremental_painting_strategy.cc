@@ -16,6 +16,10 @@
 
 namespace redblack {
 
+// TODO: make sure that invertible variables are never painted black
+// TODO: in plan reconstruction: fix conflicts on invertible variables, and in the least conflicts strategy add an assertion that invertible variables don't have conflicts
+
+
 // incremental painting strategy base class
 
 IncrementalPaintingStrategy::IncrementalPaintingStrategy(const options::Options &opts)
@@ -27,6 +31,13 @@ IncrementalPaintingStrategy::IncrementalPaintingStrategy(const options::Options 
 }
 
 IncrementalPaintingStrategy::~IncrementalPaintingStrategy() {}
+
+auto IncrementalPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting {
+	auto goal_facts = std::vector<FactPair>();
+	goal_facts.reserve(g_goal.size());
+	std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
+	return generate_next_painting(last_painting, last_plan, goal_facts);
+}
 
 
 void IncrementalPaintingStrategy::add_options_to_parser(options::OptionParser &parser) {
@@ -51,7 +62,7 @@ LeastConflictsPaintingStrategy::LeastConflictsPaintingStrategy(const options::Op
 	: IncrementalPaintingStrategy(opts),
 	  prefer_lvl(opts.get<bool>("prefer_lvl")) {}
 
-auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting {
+auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting {
 	assert(!std::all_of(std::begin(last_painting.get_painting()), std::end(last_painting.get_painting()), [](const auto is_red) { return !is_red; }));
 	auto conflicts = std::vector<int>(g_root_task()->get_num_variables(), 0);
 	auto current_state = g_root_task()->get_initial_state_values();
@@ -66,9 +77,9 @@ auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last
 			}))
 				current_state[eff.var] = eff.val;
 	}
-	for (const auto &goal : g_goal)
-		if (current_state[goal.first] != goal.second)
-			++conflicts[goal.first];
+	for (const auto &goal_fact : goal_facts)
+		if (current_state[goal_fact.var] != goal_fact.value)
+			++conflicts[goal_fact.var];
 
 	std::vector<int> level;
 	auto max_level = -1;
@@ -124,7 +135,7 @@ RandomPaintingStrategy::RandomPaintingStrategy(const options::Options &opts)
 	: IncrementalPaintingStrategy(opts),
 	  rng(utils::parse_rng_from_options(opts)) {}
 
-auto RandomPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &) -> Painting {
+auto RandomPaintingStrategy::generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &, const std::vector<FactPair> &) -> Painting {
 	assert(!std::all_of(std::begin(last_painting.get_painting()), std::end(last_painting.get_painting()), [](const auto is_red) { return !is_red; }));
 	auto red_variables = std::vector<std::size_t>();
 	red_variables.reserve(g_root_task()->get_num_variables());
