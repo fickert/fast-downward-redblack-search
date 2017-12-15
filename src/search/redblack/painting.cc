@@ -1,6 +1,7 @@
 #include "painting.h" 
 
 #include "painting_utils.h"
+#include "util.h"
 #include "../globals.h"
 #include "../options/options.h"
 #include "../options/plugin.h"
@@ -10,7 +11,6 @@
 
 #include <iostream>
 #include <map>
-#include "incremental_redblack_search.h"
 
 using namespace std;
 
@@ -18,6 +18,12 @@ namespace redblack {
 
 Painting::Painting(const std::vector<bool> &painting) : painting(painting) {}
 Painting::Painting(std::vector<bool> &&painting) : painting(std::move(painting)) {}
+
+auto operator<<(std::ostream &out, const Painting &painting) -> std::ostream & {
+	for (auto paint : painting.painting)
+		out << (paint ? 1 : 0);
+	return out;
+}
 
 PaintingFactory::PaintingFactory(const options::Options &opts)
 	: force_cg_leaves_red(opts.get<bool>("force_cg_leaves_red")) {}
@@ -515,5 +521,4 @@ static options::PluginShared<Painting> _plugin_all_black("all_black", _parse_all
 
 static options::PluginTypePlugin<Painting> _type_plugin("Red-Black Painting",
 	"Strategies to generate a painting for red-black partial delete relaxation.");
-
 }

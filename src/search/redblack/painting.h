@@ -42,6 +42,8 @@ public:
 	}
 
 	auto get_painting() const -> const InternalPaintingType & { return painting; }
+
+	friend auto operator<<(std::ostream &out, const Painting &painting) -> std::ostream &;
 };
 
 
