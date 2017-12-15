@@ -33,7 +33,7 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 		[](auto b) { return !b; });
 	std::cout << "Starting incremental red-black search, initial painting has " << num_black << " black variables ("
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
-	auto initial_node = search_space.get_node(current_initial_state);
+	auto initial_node = search_space->get_node(current_initial_state);
 	initial_node.open_initial();
 	initial_node.close();
 	incremental_redblack_search_statistics.num_episodes = 1;
@@ -62,10 +62,10 @@ auto IncrementalRedBlackSearch::update_search_space_and_check_plan(const RBPlan 
 		const auto &op = rb_op->get_base_operator();
 		if (!op.is_applicable(current_state))
 			return {false, current_state};
-		auto current_parent_node = search_space.get_node(current_state);
+		auto current_parent_node = search_space->get_node(current_state);
 		assert(current_parent_node.is_closed());
 		current_state = state_registry->get_successor_state(current_state, op);
-		auto successor_node = search_space.get_node(current_state);
+		auto successor_node = search_space->get_node(current_state);
 		if (successor_node.is_new()) {
 			successor_node.open(current_parent_node, &op);
 			successor_node.close();
@@ -79,9 +79,9 @@ auto IncrementalRedBlackSearch::update_search_space_and_check_plan(const RBPlan 
 }
 
 void IncrementalRedBlackSearch::set_solution(const Plan &partial_plan, const GlobalState &state) {
-	assert(!search_space.get_node(state).is_new());
+	assert(!search_space->get_node(state).is_new());
 	auto solution = Plan();
-	search_space.trace_path(state, solution);
+	search_space->trace_path(state, solution);
 	solution.insert(std::end(solution), std::begin(partial_plan), std::end(partial_plan));
 	set_plan(solution);
 }
@@ -141,7 +141,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	auto [is_plan, resulting_state] = update_search_space_and_check_plan(rb_plan);
 	if (is_plan) {
 		auto plan = std::vector<const GlobalOperator *>();
-		search_space.trace_path(resulting_state, plan);
+		search_space->trace_path(resulting_state, plan);
 		set_plan(plan);
 		return SOLVED;
 	}
@@ -172,7 +172,7 @@ void IncrementalRedBlackSearch::print_statistics() const {
 	std::cout << "Performed " << incremental_redblack_search_statistics.num_episodes << " episodes of red-black search." << std::endl;
 	std::cout << "Search was restarted " << incremental_redblack_search_statistics.num_restarts << " times after red-black search failed to find a solution." << std::endl;
 	statistics.print_detailed_statistics();
-	search_space.print_statistics();
+	search_space->print_statistics();
 }
 
 

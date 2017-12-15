@@ -11,8 +11,8 @@ struct RBData {
 	Painting painting;
 	RBIntPacker int_packer;
 
-	RBData(const Painting &painting)
-		: painting(painting),
+	RBData(const Painting &painting) :
+		painting(painting),
 		int_packer(this->painting) {
 		int_packer.initialize(g_variable_domain);
 	}

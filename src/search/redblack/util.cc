@@ -6,12 +6,19 @@
 #include "../options/option_parser.h"
 #include "../globals.h"
 
-int get_adjusted_action_cost(const redblack::RBOperator &op, OperatorCost cost_type) {
+auto get_adjusted_action_cost(const redblack::RBOperator &op, OperatorCost cost_type) -> int {
 	return get_adjusted_action_cost(op.get_base_operator(), cost_type);
 }
 
-int get_op_index_hacked(const redblack::RBOperator *op) {
+auto get_op_index_hacked(const redblack::RBOperator *op) -> int {
 	return get_op_index_hacked(&op->get_base_operator());
+}
+
+auto test_goal(const redblack::RBState &state) -> bool {
+	for (size_t i = 0; i < g_goal.size(); ++i)
+		if (!state.has_fact(g_goal[i].first, g_goal[i].second))
+			return false;
+	return true;
 }
 
 namespace redblack {
@@ -47,5 +54,37 @@ auto get_no_red_conditional_effect_conditions_painting(const Painting &painting)
 				if (new_painting[condition.var])
 					new_painting[condition.var] = false;
 	return Painting(new_painting);
+}
+
+auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts) -> std::vector<OperatorID> {
+	auto open = std::unordered_set<FactPair>();
+	for (const auto &goal_fact : goal_facts)
+		open.insert(goal_fact);
+	auto closed = std::unordered_set<FactPair>();
+	for (auto i = 0; i < g_root_task()->get_num_variables(); ++i)
+		closed.emplace(i, state[i]);
+	auto relaxed_plan = std::vector<OperatorID>();
+	while (!open.empty()) {
+		auto next_open = std::unordered_set<FactPair>();
+		auto this_phase_closed = std::unordered_set<FactPair>();
+		for (const auto &open_fact : open) {
+			if (closed.find(open_fact) != std::end(closed) || this_phase_closed.find(open_fact) != std::end(this_phase_closed))
+				continue;
+			auto supporter_id = best_supporters[open_fact.var][open_fact.value];
+			assert(supporter_id.get_index() != -1);
+			if (std::find(std::begin(relaxed_plan), std::end(relaxed_plan), supporter_id) == std::end(relaxed_plan)) {
+				relaxed_plan.push_back(supporter_id);
+				const auto &supporter = g_operators[supporter_id.get_index()];
+				for (const auto &precondition : supporter.get_preconditions())
+					if (state[precondition.var] != precondition.val)
+						next_open.emplace(precondition.var, precondition.val);
+				for (const auto &effect : supporter.get_effects())
+					this_phase_closed.emplace(effect.var, effect.val);
+			}
+		}
+		open = std::move(next_open);
+	}
+	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
+	return relaxed_plan;
 }
 }

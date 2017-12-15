@@ -78,9 +78,11 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
                 cout << endl << "best supporter: " << op->get_name() << endl;;
 #endif
                     
+				// TODO: can't we simplify this? the best supporter may achieve multiple facts at once, we can probably save some operators
                 if (std::find(ops_current_step.begin(), ops_current_step.end(), op_id) == ops_current_step.end()){
                     ops_current_step.push_back(op_id);
                     for (auto const &pre : op.get_red_preconditions()) {
+						// TODO: ??
                         change |= new_marked.insert(std::make_pair(pre->var, pre->val)).second;
 #ifdef DEBUG_PLAN_EXTRACTION
                         cout << "marked precondition fact " << g_fact_names[pre->var][pre->val] << endl;

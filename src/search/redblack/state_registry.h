@@ -25,9 +25,16 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 
 	std::unique_ptr<StateSaturation> state_saturation;
 
-	static auto construct_redblack_operators(const Painting &painting)->std::vector<RBOperator>;
+	static auto get_state_saturation(const AbstractTask &task, const RBIntPacker &state_packer, const std::vector<RBOperator> &operators) -> std::unique_ptr<StateSaturation>;
+	static auto construct_redblack_operators(const Painting &painting) -> std::vector<RBOperator>;
+
+	auto get_state(const std::vector<int> &values, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
+	auto get_successor_state(const RBState &predecessor, const RBOperator &op, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 
 public:
+	RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
+	                AxiomEvaluator &axiom_evaluator, std::vector<int> &&initial_state_data,
+	                PackedStateBin *rb_initial_state_data = nullptr);
 	RBStateRegistry(const AbstractTask &task, const RBIntPacker &state_packer,
 	                AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data,
 	                PackedStateBin *rb_initial_state_data = nullptr);
@@ -40,8 +47,10 @@ public:
 	auto lookup_state(StateID id) const -> RBState override;
 	auto get_initial_state() -> const RBState & override;
 	auto get_successor_state(const RBState &predecessor, const RBOperator &op) -> RBState override;
-
+	auto get_successor_state_and_best_supporters(const RBState &predecessor, const RBOperator &op) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 	auto get_best_supporters_for_successor(const RBState &predecessor, const RBOperator &op) const -> std::vector<std::vector<OperatorID>>;
+	auto get_state(const std::vector<int> &values) -> RBState;
+	auto get_state_and_best_supporters(const std::vector<int> &values) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 
 	auto get_painting() const -> const Painting & { return *painting; }
 

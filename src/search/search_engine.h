@@ -43,10 +43,11 @@ private:
     bool solution_found;
     Plan plan;
 protected:
-    SearchEngine(const options::Options &opts, std::unique_ptr<StateRegistryBase<StateType, OperatorType>> state_registry);
+    SearchEngine(const options::Options &opts, std::shared_ptr<StateRegistryBase<StateType, OperatorType>> state_registry);
+    SearchEngine(const options::Options &opts, std::shared_ptr<StateRegistryBase<StateType, OperatorType>> state_registry, std::shared_ptr<SearchSpace<StateType, OperatorType>> search_space);
 
-    std::unique_ptr<StateRegistryBase<StateType, OperatorType>> state_registry;
-    SearchSpace<StateType, OperatorType> search_space;
+    std::shared_ptr<StateRegistryBase<StateType, OperatorType>> state_registry;
+    std::shared_ptr<SearchSpace<StateType, OperatorType>> search_space;
     SearchProgress<StateType, OperatorType> search_progress;
     SearchStatistics statistics;
     int bound;
@@ -99,11 +100,28 @@ SearchEngine<StateType, OperatorType>::SearchEngine(const options::Options &opts
 
 template <class StateType, class OperatorType>
 SearchEngine<StateType, OperatorType>::SearchEngine(const options::Options &opts,
-	std::unique_ptr<StateRegistryBase<StateType, OperatorType>> state_registry)
+	std::shared_ptr<StateRegistryBase<StateType, OperatorType>> state_registry)
 	: status(IN_PROGRESS),
 	  solution_found(false),
-	  state_registry(std::move(state_registry)),
-	  search_space(*this->state_registry, static_cast<OperatorCost>(opts.get_enum("cost_type"))),
+	  state_registry(state_registry),
+	  search_space(std::make_shared<SearchSpace<StateType, OperatorType>>(*this->state_registry, static_cast<OperatorCost>(opts.get_enum("cost_type")))),
+	  cost_type(static_cast<OperatorCost>(opts.get_enum("cost_type"))),
+	  max_time(opts.get<double>("max_time")) {
+	if (opts.get<int>("bound") < 0) {
+		std::cerr << "error: negative cost bound " << opts.get<int>("bound") << std::endl;
+		utils::exit_with(utils::ExitCode::INPUT_ERROR);
+	}
+	bound = opts.get<int>("bound");
+}
+
+template <class StateType, class OperatorType>
+SearchEngine<StateType, OperatorType>::SearchEngine(const options::Options &opts,
+	std::shared_ptr<StateRegistryBase<StateType, OperatorType>> state_registry,
+	std::shared_ptr<SearchSpace<StateType, OperatorType>> search_space)
+	: status(IN_PROGRESS),
+	  solution_found(false),
+	  state_registry(state_registry),
+	  search_space(search_space),
 	  cost_type(static_cast<OperatorCost>(opts.get_enum("cost_type"))),
 	  max_time(opts.get<double>("max_time")) {
 	if (opts.get<int>("bound") < 0) {

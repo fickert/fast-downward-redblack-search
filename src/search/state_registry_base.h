@@ -206,7 +206,7 @@ protected:
     const int_packer::IntPacker &state_packer;
 
     AxiomEvaluator &axiom_evaluator;
-    const std::vector<int> &initial_state_data;
+    const std::vector<int> initial_state_data;
     const int num_variables;
 
     segmented_vector::SegmentedArrayVector<PackedStateBin> state_data_pool;
@@ -218,6 +218,9 @@ protected:
     StateID insert_id_or_pop_state();
     int get_bins_per_state() const;
 public:
+    StateRegistryBase(
+        const AbstractTask &task, const int_packer::IntPacker &state_packer,
+        AxiomEvaluator &axiom_evaluator, std::vector<int> &&initial_state_data);
     StateRegistryBase(
         const AbstractTask &task, const int_packer::IntPacker &state_packer,
         AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data);
@@ -325,12 +328,29 @@ public:
 template<class StateType, class OperatorType>
 StateRegistryBase<StateType, OperatorType>::StateRegistryBase(
     const AbstractTask &task, const int_packer::IntPacker &state_packer,
+    AxiomEvaluator &axiom_evaluator, std::vector<int> &&initial_state_data)
+    : task(task),
+      state_packer(state_packer),
+      axiom_evaluator(axiom_evaluator),
+      initial_state_data(std::move(initial_state_data)),
+      num_variables(this->initial_state_data.size()),
+      state_data_pool(get_bins_per_state()),
+      registered_states(
+          0,
+          StateIDSemanticHash(state_data_pool, get_bins_per_state()),
+          StateIDSemanticEqual(state_data_pool, get_bins_per_state())),
+      cached_initial_state(0) {
+}
+
+template<class StateType, class OperatorType>
+StateRegistryBase<StateType, OperatorType>::StateRegistryBase(
+    const AbstractTask &task, const int_packer::IntPacker &state_packer,
     AxiomEvaluator &axiom_evaluator, const std::vector<int> &initial_state_data)
     : task(task),
       state_packer(state_packer),
       axiom_evaluator(axiom_evaluator),
       initial_state_data(initial_state_data),
-      num_variables(initial_state_data.size()),
+      num_variables(this->initial_state_data.size()),
       state_data_pool(get_bins_per_state()),
       registered_states(
           0,

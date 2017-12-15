@@ -11,7 +11,7 @@ bool SearchEngine<redblack::RBState, redblack::RBOperator>::check_goal_and_set_p
 	})) {
 		std::cout << "Red-Black solution found!" << std::endl;
 		Plan plan;
-		search_space.trace_path(state, plan);
+		search_space->trace_path(state, plan);
 		set_plan(plan);
 		return true;
 	}

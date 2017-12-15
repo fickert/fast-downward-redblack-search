@@ -19,10 +19,10 @@ template<>
 SearchEngine<GlobalState, GlobalOperator>::SearchEngine(const Options &opts)
     : status(IN_PROGRESS),
       solution_found(false),
-      state_registry(std::make_unique<StateRegistryBase<GlobalState, GlobalOperator>>(
+      state_registry(std::make_shared<StateRegistryBase<GlobalState, GlobalOperator>>(
           *g_root_task(), *g_state_packer, *g_axiom_evaluator, g_initial_state_data)),
-      search_space(*state_registry,
-                   static_cast<OperatorCost>(opts.get_enum("cost_type"))),
+      search_space(std::make_shared<SearchSpace<GlobalState, GlobalOperator>>(*state_registry,
+                   static_cast<OperatorCost>(opts.get_enum("cost_type")))),
       cost_type(static_cast<OperatorCost>(opts.get_enum("cost_type"))),
       max_time(opts.get<double>("max_time")) {
     if (opts.get<int>("bound") < 0) {
@@ -37,7 +37,7 @@ bool SearchEngine<GlobalState, GlobalOperator>::check_goal_and_set_plan(const Gl
     if (test_goal(state)) {
         cout << "Solution found!" << endl;
         Plan plan;
-        search_space.trace_path(state, plan);
+        search_space->trace_path(state, plan);
         set_plan(plan);
         return true;
     }

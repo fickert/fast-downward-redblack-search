@@ -2,14 +2,21 @@
 #define REDBLACK_UTIL_H
 
 #include "../operator_cost.h"
+#include <vector>
+
+struct FactPair;
+class OperatorID;
+class GlobalState;
 
 namespace redblack {
 class Painting;
+class RBState;
 class RBOperator;
 }
 
-int get_adjusted_action_cost(const redblack::RBOperator &op, OperatorCost cost_type);
-int get_op_index_hacked(const redblack::RBOperator *op);
+auto get_adjusted_action_cost(const redblack::RBOperator &op, OperatorCost cost_type) -> int;
+auto get_op_index_hacked(const redblack::RBOperator *op) -> int;
+auto test_goal(const redblack::RBState &state) -> bool;
 
 namespace options {
 class Options;
@@ -18,8 +25,11 @@ class Options;
 namespace redblack {
 void add_num_black_options(options::OptionParser &parser);
 auto get_num_black(const options::Options &opts, bool min_one_if_ratio = false) -> int;
+
 auto any_conditional_effect_condition_is_red(const Painting &painting) -> int;
 auto get_no_red_conditional_effect_conditions_painting(const Painting &painting) -> Painting;
+
+auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts) -> std::vector<OperatorID>;
 }
 
 
