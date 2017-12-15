@@ -11,12 +11,14 @@
 
 namespace redblack {
 
-void verify_black_variable_values(const RBState &rb_state, const GlobalState &global_state) {
 #ifndef NDEBUG
+void verify_black_variable_values(const RBState &rb_state, const GlobalState &global_state) {
 	for (auto i = 0; i < g_root_task()->get_num_variables(); ++i)
 		assert(rb_state.get_painting().is_red_var(i) || rb_state[i] == global_state[i]);
-#endif
 }
+#else
+void verify_black_variable_values(const RBState &, const GlobalState &) {}
+#endif
 
 HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &opts,
                                                        std::shared_ptr<RBStateRegistry> state_registry,
