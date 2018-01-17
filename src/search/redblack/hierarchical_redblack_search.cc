@@ -26,11 +26,16 @@ HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &o
                                                        GlobalState current_initial_state,
                                                        StateRegistryBase<GlobalState, GlobalOperator> &global_state_registry,
                                                        SearchSpace<GlobalState, GlobalOperator> &global_search_space,
-                                                       std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
+                                                       std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
+                                                       std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic,
+                                                       std::shared_ptr<RedActionsManager> red_actions_manager,
                                                        int num_black,
                                                        bool initial_state_is_preferred,
                                                        int initial_state_h_value)
 	: LazySearch<RBState, RBOperator>(opts, state_registry, search_space),
+	  repair_red_plans(opts.get<bool>("repair_red_plans")),
+	  plan_repair_heuristic(plan_repair_heuristic),
+	  red_actions_manager(red_actions_manager),
 	  is_current_preferred(initial_state_is_preferred),
 	  current_key(initial_state_h_value),
 	  child_searches(),
@@ -87,15 +92,17 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 	if (rb_search_space_it == std::end(rb_search_spaces)) {
 		auto new_rb_data = std::make_shared<RBData>(painting);
 		auto new_state_registry = std::shared_ptr<RBStateRegistry>(new_rb_data->construct_state_registry(initial_state.get_values()));
+		auto new_red_actions_manager = repair_red_plans ? std::make_shared<RedActionsManager>(*g_root_task(), new_state_registry->get_operators(), new_rb_data->painting) : nullptr;
 		auto new_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*new_state_registry, static_cast<OperatorCost>(search_options.get_enum("cost_type")));
-		rb_search_space_it = rb_search_spaces.insert({painting.get_painting(), {new_rb_data, new_state_registry, new_search_space}}).first;
+		rb_search_space_it = rb_search_spaces.insert({painting.get_painting(), {new_rb_data, new_state_registry, new_red_actions_manager, new_search_space}}).first;
 		painting_is_new = true;
 	}
 	assert(!initial_state.get_values().empty());
 	assert(rb_search_space_it != std::end(rb_search_spaces));
 	child_searches[current_state.get_id()].emplace_back(std::make_unique<HierarchicalRedBlackSearch>(
-		search_options, std::get<1>(rb_search_space_it->second), std::get<2>(rb_search_space_it->second),
-		initial_state, global_state_registry, global_search_space, rb_search_spaces, num_black, preferred, key));
+		search_options, std::get<1>(rb_search_space_it->second), std::get<3>(rb_search_space_it->second),
+		initial_state, global_state_registry, global_search_space, rb_search_spaces, plan_repair_heuristic,
+		std::get<std::shared_ptr<RedActionsManager>>(rb_search_space_it->second), num_black, preferred, key));
 	if (!painting_is_new) {
 		// state registry initial state doesn't match the actual initial state that should be used in the search
 		auto &child_search = *child_searches.at(current_state.get_id()).back();
@@ -207,6 +214,8 @@ SearchStatus HierarchicalRedBlackSearch::step() {
 					goal_facts.reserve(g_goal.size());
 					std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
 					auto red_plan = get_red_plan(current_best_supporters, current_global_state, goal_facts);
+					if (repair_red_plans && !check_plan(current_global_state, red_plan, goal_facts))
+						red_plan = get_repaired_plan(current_global_state, red_plan, goal_facts);
 					auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, goal_facts);
 					if (is_plan) {
 						global_goal_state = resulting_state.get_id();
@@ -259,6 +268,8 @@ void HierarchicalRedBlackSearch::generate_successors() {
 		assert(global_search_space.get_node(current_global_state).is_closed());
 
 		auto red_plan = get_red_plan(current_best_supporters, current_global_state, precondition_facts);
+		if (repair_red_plans && !check_plan(current_global_state, red_plan, precondition_facts))
+			red_plan = get_repaired_plan(current_global_state, red_plan, precondition_facts);
 		auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, precondition_facts);
 
 		auto is_preferred = preferred_operators.contains(op_id);
@@ -362,6 +373,26 @@ void HierarchicalRedBlackSearchWrapper::print_statistics() const {
 	search_space->print_statistics();
 }
 
+auto HierarchicalRedBlackSearch::check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> bool {
+	auto state_values = state.get_values();
+	auto is_currently_true = [&state_values](const auto &condition) { return state_values[condition.var] == condition.val; };
+	for (const auto &op_id : plan) {
+		const auto &op = g_operators[op_id.get_index()];
+		if (!std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), is_currently_true))
+			return false;
+		for (const auto &effect : op.get_effects())
+			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), is_currently_true))
+				state_values[effect.var] = effect.val;
+	}
+	return std::all_of(std::begin(goal_facts), std::end(goal_facts), [&state_values](const auto &goal_fact) { return state_values[goal_fact.var] == goal_fact.value; });
+}
+
+auto HierarchicalRedBlackSearch::get_repaired_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) const -> std::vector<OperatorID> {
+	auto result = plan_repair_heuristic->compute_semi_relaxed_plan(state, goal_facts, plan, red_actions_manager.get()->get_red_actions_for_state(state));
+//	return result.first ? result.second : plan;
+	return result.second;
+}
+
 auto HierarchicalRedBlackSearch::update_search_space_and_check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState> {
 	auto current_state = state;
 	for (const auto op_id : plan) {
@@ -401,12 +432,31 @@ HierarchicalRedBlackSearchWrapper::HierarchicalRedBlackSearchWrapper(const optio
 	auto rb_search_options = get_rb_search_options(opts);
 	auto root_rb_data = std::make_shared<RBData>(*opts.get<std::shared_ptr<Painting>>("base_painting"));
 	auto root_state_registry = std::shared_ptr<RBStateRegistry>(root_rb_data->construct_state_registry(g_initial_state_data));
+	auto root_red_actions_manager = opts.get<bool>("repair_red_plans") ? std::make_shared<RedActionsManager>(*g_root_task(), root_state_registry->get_operators(), root_rb_data->painting) : nullptr;
 	auto root_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*root_state_registry, static_cast<OperatorCost>(rb_search_options.get_enum("cost_type")));
-	rb_search_spaces.insert({root_rb_data->painting.get_painting(), {root_rb_data, root_state_registry, root_search_space}});
-	root_search_engine = std::make_unique<HierarchicalRedBlackSearch>(rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(), *state_registry, *search_space, rb_search_spaces, num_black);
+	rb_search_spaces.insert({root_rb_data->painting.get_painting(), {root_rb_data, root_state_registry, root_red_actions_manager, root_search_space}});
+	auto plan_repair_heuristic = get_rb_plan_repair_heuristic(opts);
+	root_search_engine = std::make_unique<HierarchicalRedBlackSearch>(rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(), *state_registry, *search_space, rb_search_spaces, plan_repair_heuristic, root_red_actions_manager, num_black);
 	auto initial_node = search_space->get_node(state_registry->get_initial_state());
 	initial_node.open_initial();
 	initial_node.close();
+}
+
+auto HierarchicalRedBlackSearchWrapper::get_rb_plan_repair_heuristic(const options::Options &opts) -> std::shared_ptr<RedBlackDAGFactFollowingHeuristic> {
+	if (!opts.get<bool>("repair_red_plans"))
+		return nullptr;
+	auto plan_repair_options = options::Options();
+	plan_repair_options.set<std::shared_ptr<AbstractTask>>("transform", g_root_task());
+	plan_repair_options.set<bool>("cache_estimates", false);
+	plan_repair_options.set<bool>("extract_plan", true);
+	plan_repair_options.set<bool>("paint_roots_black", false);
+	plan_repair_options.set<bool>("ignore_invertibility", false);
+	plan_repair_options.set<int>("prefs", 0);
+	plan_repair_options.set<bool>("applicable_paths_first", false);
+	plan_repair_options.set<bool>("next_red_action_test", false);
+	plan_repair_options.set<bool>("use_connected", false);
+	plan_repair_options.set<bool>("extract_plan_no_blacks", false);
+	return std::make_shared<RedBlackDAGFactFollowingHeuristic>(plan_repair_options);
 }
 
 auto HierarchicalRedBlackSearchWrapper::get_rb_search_options(const options::Options &opts) -> options::Options {
@@ -427,6 +477,7 @@ void HierarchicalRedBlackSearchWrapper::add_options_to_parser(options::OptionPar
 	parser.add_option<std::shared_ptr<Painting>>("base_painting", "painting to be used in the initial red-black search", "all_red()");
 	parser.add_option<Heuristic<RBState, RBOperator> *>("heuristic", "red-black heuristic that will be passed to the underlying red-black search engine", "ff_rb(transform=adapt_costs(cost_type=1))");
 	parser.add_option<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy", "strategy for painting more variables black after finding a red-black solution with conflicts", "least_conflicts()");
+	parser.add_option<bool>("repair_red_plans", "attempt to repair red plans using Mercury", "true");
 	add_num_black_options(parser);
 	add_succ_order_options(parser);
 }

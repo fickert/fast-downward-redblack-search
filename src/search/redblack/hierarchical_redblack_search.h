@@ -6,6 +6,8 @@
 #include "../search_engines/lazy_search.h"
 #include "operator.h"
 #include "rb_data.h"
+#include "red_actions_manager.h"
+#include "mercury/red_black_DAG_fact_following_heuristic.h"
 
 
 #ifdef _MSC_VER
@@ -29,7 +31,9 @@ public:
 	                           GlobalState current_initial_state,
 	                           StateRegistryBase<GlobalState, GlobalOperator> &global_state_registry,
 	                           SearchSpace<GlobalState, GlobalOperator> &global_search_space,
-	                           std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
+	                           std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
+	                           std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic,
+	                           std::shared_ptr<RedActionsManager> red_actions_manager,
 	                           int num_black,
 	                           bool initial_state_is_preferred = true,
 	                           int initial_state_h_value = 0);
@@ -42,11 +46,17 @@ protected:
 	void generate_successors() override;
 	SearchStatus fetch_next_state() override;
 
+	static auto check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> bool;
+	auto get_repaired_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) const -> std::vector<OperatorID>;
 	auto update_search_space_and_check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState>;
 
 	void enqueue_new_search(const Painting &new_painting, const GlobalState &initial_state, int key, bool preferred, EvaluationContext<RBState, RBOperator> &new_eval_context);
 
 	auto get_hacked_cache_for_key(int key) const -> HeuristicCache<RBState, RBOperator>;
+
+	const bool repair_red_plans;
+	std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic;
+	std::shared_ptr<RedActionsManager> red_actions_manager;
 
 	bool is_current_preferred;
 	int current_key;
@@ -70,7 +80,7 @@ protected:
 	GlobalState current_initial_state;
 	StateRegistryBase<GlobalState, GlobalOperator> &global_state_registry;
 	SearchSpace<GlobalState, GlobalOperator> &global_search_space;
-	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces;
+	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces;
 	const int num_black;
 
 	struct IncrementalRedBlackSearchStatistics {
@@ -89,12 +99,12 @@ public:
 	void print_statistics() const override;
 
 protected:
-
+	static auto get_rb_plan_repair_heuristic(const options::Options &opts) -> std::shared_ptr<RedBlackDAGFactFollowingHeuristic>;
 	static auto get_rb_search_options(const options::Options &opts) -> options::Options;
 	void update_statistics();
 
 	std::unique_ptr<HierarchicalRedBlackSearch> root_search_engine;
-	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> rb_search_spaces;
+	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> rb_search_spaces;
 	const int num_black;
 
 };
