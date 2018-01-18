@@ -4,6 +4,9 @@
 #include <set>
 using namespace std;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 bool TopologicalSort::get_result(vector<int>& res) {
 	// returns true iff the graph is a DAG
 	// Algorithm by  Kahn (1962)
@@ -66,4 +69,4 @@ else
     return true;
 }
 
-
+#pragma GCC diagnostic pop

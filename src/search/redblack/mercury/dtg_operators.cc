@@ -10,6 +10,9 @@
 #include "graph_algorithms/scc.h"
 #include "../../globals.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 DtgOperators::DtgOperators(int v) : var(v), is_root(false),
 									range(g_variable_domain[var]),
 									goal_val(-1),
@@ -856,3 +859,5 @@ bool DtgOperators::is_transition_enabled(const GraphEdge& trans, int from) const
 	}
 	return trans.initially_enabled || base_pointer->op_is_enabled(trans.op_no);
 }
+
+#pragma GCC diagnostic pop

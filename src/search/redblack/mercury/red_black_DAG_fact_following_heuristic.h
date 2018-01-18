@@ -18,6 +18,9 @@ using namespace std;
 #include "red_black_operator.h"
 #include "../../task_utils/causal_graph.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreorder"
+
 enum ActionApplicationResult {
     ACTION_APPLICABLE,
     ACTION_NOT_APPLICABLE,
@@ -256,5 +259,7 @@ public:
 	bool op_is_enabled(int op_no) const;
 	bool is_currently_applicable(const vector<int>& ops, bool skip_black=false);
 };
+
+#pragma GCC diagnostic pop
 
 #endif

@@ -5,6 +5,8 @@
 
 using namespace std;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
 
 
 TransitiveClosure::TransitiveClosure(const vector<vector<int> > &theGraph) : graph(theGraph) {
@@ -42,3 +44,5 @@ TransitiveClosure::TransitiveClosure(const vector<vector<int> > &theGraph) : gra
 bool TransitiveClosure::is_connected(int from, int to) const {
 	return (solution[from][to] < numeric_limits<int>::max() );
 }
+
+#pragma GCC diagnostic pop

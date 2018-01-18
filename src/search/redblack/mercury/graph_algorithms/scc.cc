@@ -3,6 +3,9 @@
 #include <vector>
 using namespace std;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 vector<vector<int> > SCC::get_result() {
     int node_count = graph.size();
     dfs_numbers.resize(node_count, -1);
@@ -48,3 +51,5 @@ void SCC::dfs(int vertex) {
         sccs.push_back(scc);
     }
 }
+
+#pragma GCC diagnostic pop

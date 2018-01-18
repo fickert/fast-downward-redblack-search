@@ -728,11 +728,18 @@ fast_downward_plugin(
         redblack/rb_ff_heuristic
         redblack/rb_lazy_search
         redblack/rb_search_engine
+	redblack/red_actions_manager
         redblack/search_space
         redblack/state
         redblack/state_registry
         redblack/state_saturation
         redblack/util
+        redblack/mercury/dtg_operators
+        redblack/mercury/red_black_DAG_fact_following_heuristic
+        redblack/mercury/red_black_operator
+        redblack/mercury/graph_algorithms/scc
+        redblack/mercury/graph_algorithms/topological_sort
+        redblack/mercury/graph_algorithms/transitive_closure
     DEPENDS BOOST SCCS LAZY_SEARCH FF_HEURISTIC
 )
 
