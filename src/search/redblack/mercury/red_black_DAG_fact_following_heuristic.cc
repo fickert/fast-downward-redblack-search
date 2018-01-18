@@ -859,7 +859,7 @@ void RedBlackDAGFactFollowingHeuristic::precalculate_shortest_paths_for_var(int 
     if (!black_vars[var])
     	return;
 
-	if (get_cg_predecessors(var).size() == 0) {
+    if (get_cg_predecessors(var).size() == 0) {
 //    	cout << "Storing shortest paths and costs for root variable " << var << endl;
 		get_dtg(var)->calculate_shortest_paths_for_root();
     	return;
@@ -1703,7 +1703,7 @@ int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_DAG(const GlobalState &
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void RedBlackDAGFactFollowingHeuristic::set_op_as_preferred(const GlobalState &state, int op_no, bool relaxed) {
+void RedBlackDAGFactFollowingHeuristic::set_op_as_preferred(const GlobalState &, int, bool) {
 	return;
 	//// No need to consider non-relaxed operators in this case
 	//if (preferred_type == RELAXED)
@@ -2001,10 +2001,10 @@ void RedBlackDAGFactFollowingHeuristic::add_options_to_parser(OptionParser &pars
 	parser.add_option<bool>("extract_plan", "attempts extracting plan from the heuristic solution", "false");
 
     // Options for coloring
-    parser.add_option<bool>("paint_roots_black", false);
+    parser.add_option<bool>("paint_roots_black", "false");
 
     // Running with this option is not safe - may return DEAD_END for non dead end states.
-    parser.add_option<bool>("ignore_invertibility", false);
+    parser.add_option<bool>("ignore_invertibility", "false");
 
     vector<string> pref_types;
     pref_types.push_back("relaxed");
@@ -2015,12 +2015,12 @@ void RedBlackDAGFactFollowingHeuristic::add_options_to_parser(OptionParser &pars
                            "preferred operators");
 
     // Change to true and remove in the final version
-    parser.add_option<bool>("applicable_paths_first", false);
-    parser.add_option<bool>("next_red_action_test", false);
-    parser.add_option<bool>("use_connected", false);
+    parser.add_option<bool>("applicable_paths_first", "false");
+    parser.add_option<bool>("next_red_action_test", "false");
+    parser.add_option<bool>("use_connected", "false");
 
     // Extracting plan if FF is used
-	parser.add_option<bool>("extract_plan_no_blacks", false,
+	parser.add_option<bool>("extract_plan_no_blacks", "false",
                             "attempts extracting plan from the heuristic solution");
 }
 
