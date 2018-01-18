@@ -4,7 +4,7 @@
 
 namespace redblack {
 
-RedActionsManager::RedActionsManager(const AbstractTask &task, const std::vector<RBOperator> &operators, const Painting &painting)
+RedActionsManager::RedActionsManager(const std::vector<RBOperator> &operators)
 	: red_operators(operators.size()),
 	  conditionally_red_operators() {
 	for (auto i = 0u; i < operators.size(); ++i) {

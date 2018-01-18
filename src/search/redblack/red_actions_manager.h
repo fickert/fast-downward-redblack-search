@@ -14,7 +14,7 @@ class RedActionsManager {
 	std::unordered_map<std::vector<FactPair>, boost::dynamic_bitset<>> conditionally_red_operators;
 
 public:
-	RedActionsManager(const AbstractTask &task, const std::vector<RBOperator> &operators, const Painting &painting);
+	RedActionsManager(const std::vector<RBOperator> &operators);
 
 	auto get_red_actions_for_state(const GlobalState &state) -> boost::dynamic_bitset<>;
 };

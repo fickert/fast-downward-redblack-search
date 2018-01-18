@@ -92,7 +92,7 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 	if (rb_search_space_it == std::end(rb_search_spaces)) {
 		auto new_rb_data = std::make_shared<RBData>(painting);
 		auto new_state_registry = std::shared_ptr<RBStateRegistry>(new_rb_data->construct_state_registry(initial_state.get_values()));
-		auto new_red_actions_manager = repair_red_plans ? std::make_shared<RedActionsManager>(*g_root_task(), new_state_registry->get_operators(), new_rb_data->painting) : nullptr;
+		auto new_red_actions_manager = repair_red_plans ? std::make_shared<RedActionsManager>(new_state_registry->get_operators()) : nullptr;
 		auto new_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*new_state_registry, static_cast<OperatorCost>(search_options.get_enum("cost_type")));
 		rb_search_space_it = rb_search_spaces.insert({painting.get_painting(), {new_rb_data, new_state_registry, new_red_actions_manager, new_search_space}}).first;
 		painting_is_new = true;
@@ -432,7 +432,7 @@ HierarchicalRedBlackSearchWrapper::HierarchicalRedBlackSearchWrapper(const optio
 	auto rb_search_options = get_rb_search_options(opts);
 	auto root_rb_data = std::make_shared<RBData>(*opts.get<std::shared_ptr<Painting>>("base_painting"));
 	auto root_state_registry = std::shared_ptr<RBStateRegistry>(root_rb_data->construct_state_registry(g_initial_state_data));
-	auto root_red_actions_manager = opts.get<bool>("repair_red_plans") ? std::make_shared<RedActionsManager>(*g_root_task(), root_state_registry->get_operators(), root_rb_data->painting) : nullptr;
+	auto root_red_actions_manager = opts.get<bool>("repair_red_plans") ? std::make_shared<RedActionsManager>(root_state_registry->get_operators()) : nullptr;
 	auto root_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*root_state_registry, static_cast<OperatorCost>(rb_search_options.get_enum("cost_type")));
 	rb_search_spaces.insert({root_rb_data->painting.get_painting(), {root_rb_data, root_state_registry, root_red_actions_manager, root_search_space}});
 	auto plan_repair_heuristic = get_rb_plan_repair_heuristic(opts);
