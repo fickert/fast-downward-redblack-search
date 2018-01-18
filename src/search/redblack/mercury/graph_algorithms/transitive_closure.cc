@@ -5,8 +5,10 @@
 
 using namespace std;
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
 
 
 TransitiveClosure::TransitiveClosure(const vector<vector<int> > &theGraph) : graph(theGraph) {
@@ -45,4 +47,6 @@ bool TransitiveClosure::is_connected(int from, int to) const {
 	return (solution[from][to] < numeric_limits<int>::max() );
 }
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif

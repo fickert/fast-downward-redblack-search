@@ -18,8 +18,10 @@ using namespace std;
 #include "red_black_operator.h"
 #include "../../task_utils/causal_graph.h"
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
+#endif
 
 enum ActionApplicationResult {
     ACTION_APPLICABLE,
@@ -260,6 +262,8 @@ public:
 	bool is_currently_applicable(const vector<int>& ops, bool skip_black=false);
 };
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 
 #endif

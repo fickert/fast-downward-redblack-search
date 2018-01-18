@@ -4,8 +4,10 @@
 #include <set>
 using namespace std;
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
 
 bool TopologicalSort::get_result(vector<int>& res) {
 	// returns true iff the graph is a DAG
@@ -69,4 +71,6 @@ else
     return true;
 }
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif

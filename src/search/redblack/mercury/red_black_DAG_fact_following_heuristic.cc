@@ -13,9 +13,11 @@
 
 using namespace std;
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wreorder"
+#endif
 
 RedBlackDAGFactFollowingHeuristic::RedBlackDAGFactFollowingHeuristic(const Options &opts)
     : additive_heuristic::AdditiveHeuristic<GlobalState, GlobalOperator>(opts), extract_plan(opts.get<bool>("extract_plan")), solution_found(false), suffix_plan(), applicability_status(false)
@@ -2281,4 +2283,6 @@ static Heuristic<GlobalState, GlobalOperator> *_parse(OptionParser &parser) {
 
 static Plugin<Heuristic<GlobalState, GlobalOperator>> _plugin("RB", _parse);
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif

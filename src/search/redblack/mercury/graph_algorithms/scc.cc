@@ -3,8 +3,10 @@
 #include <vector>
 using namespace std;
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
 
 vector<vector<int> > SCC::get_result() {
     int node_count = graph.size();
@@ -52,4 +54,6 @@ void SCC::dfs(int vertex) {
     }
 }
 
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
