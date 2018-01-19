@@ -391,15 +391,21 @@ auto HierarchicalRedBlackSearch::get_repaired_plan(const GlobalState &state, con
 #ifndef NDEBUG
 	auto red_actions = red_actions_manager.get()->get_red_actions_for_state(state);
 	for (auto i = 0u; i < g_operators.size(); ++i) {
+		// the action can be used in the relaxed plan if
+		// 1. it doesn't have any black preconditions that are not true in the current state
 		if (red_actions[i] != (std::none_of(std::begin(g_operators[i].get_preconditions()), std::end(g_operators[i].get_preconditions()), [this](const auto &precondition) {
 			return current_eval_context.get_state().get_painting().is_black_var(precondition.var) &&
 				current_eval_context.get_state()[precondition.var] != precondition.val;
+		// 2. it doesn't have any black effects that modify the current state
 		}) && std::none_of(std::begin(g_operators[i].get_effects()), std::end(g_operators[i].get_effects()), [this](const auto &effect) {
 			return current_eval_context.get_state().get_painting().is_black_var(effect.var) &&
 				current_eval_context.get_state()[effect.var] != effect.val &&
 				std::all_of(std::begin(effect.conditions), std::end(effect.conditions), [this](const auto &condition) {
 				return current_eval_context.get_state().has_fact(condition.var, condition.val);
 			});
+		// 3. it has a red effect
+		}) && std::any_of(std::begin(g_operators[i].get_effects()), std::end(g_operators[i].get_effects()), [this](const auto &effect) {
+			return current_eval_context.get_state().get_painting().is_red_var(effect.var); 
 		}))) {
 			for (auto var = 0; var < g_root_task()->get_num_variables(); ++var)
 				if (current_eval_context.get_state().get_painting().is_black_var(var))
