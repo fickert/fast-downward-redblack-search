@@ -1427,10 +1427,10 @@ int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_disconnected(const Glob
 	    const vector<int>& ops_no = get_path_for_var(var);
 
 		if (ops_no.size() == 0) {
-			if (!ignore_invertibility) {
-				cout << "Returned DEAD_END for invertible variable! Should not happen! Bug!" << endl;
-				utils::exit_with(utils::ExitCode::CRITICAL_ERROR);
-			}
+			//if (!ignore_invertibility) {
+			//	cout << "Returned DEAD_END for invertible variable! Should not happen! Bug!" << endl;
+			//	utils::exit_with(utils::ExitCode::CRITICAL_ERROR);
+			//}
 			return DEAD_END;
 		}
 
