@@ -388,7 +388,39 @@ auto HierarchicalRedBlackSearch::check_plan(const GlobalState &state, const std:
 }
 
 auto HierarchicalRedBlackSearch::get_repaired_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) const -> std::vector<OperatorID> {
+#ifndef NDEBUG
+	auto red_actions = red_actions_manager.get()->get_red_actions_for_state(state);
+	for (auto i = 0u; i < g_operators.size(); ++i) {
+		if (red_actions[i] != (std::none_of(std::begin(g_operators[i].get_preconditions()), std::end(g_operators[i].get_preconditions()), [this](const auto &precondition) {
+			return current_eval_context.get_state().get_painting().is_black_var(precondition.var) &&
+				current_eval_context.get_state()[precondition.var] != precondition.val;
+		}) && std::none_of(std::begin(g_operators[i].get_effects()), std::end(g_operators[i].get_effects()), [this](const auto &effect) {
+			return current_eval_context.get_state().get_painting().is_black_var(effect.var) &&
+				current_eval_context.get_state()[effect.var] != effect.val &&
+				std::all_of(std::begin(effect.conditions), std::end(effect.conditions), [this](const auto &condition) {
+				return current_eval_context.get_state().has_fact(condition.var, condition.val);
+			});
+		}))) {
+			for (auto var = 0; var < g_root_task()->get_num_variables(); ++var)
+				if (current_eval_context.get_state().get_painting().is_black_var(var))
+					std::cout << "black var " << var << " = " << current_eval_context.get_state()[var] << std::endl;
+			std::cout << "action " << i << " is " << (red_actions[i] ? "red" : "black") << std::endl;
+			std::cout << "  preconditions: " << std::endl;
+			for (const auto &precondition : g_operators[i].get_preconditions())
+				std::cout << "    " << precondition.var << ", " << precondition.val << std::endl;
+			std::cout << "  effects:" << std::endl;
+			for (const auto &effect : g_operators[i].get_effects()) {
+				assert(effect.conditions.empty());
+				std::cout << "    " << effect.var << ", " << effect.val << std::endl;
+			}
+			assert(false);
+		}
+	}
+#endif
 	auto result = plan_repair_heuristic->compute_semi_relaxed_plan(state, goal_facts, plan, red_actions_manager.get()->get_red_actions_for_state(state));
+#ifndef NDEBUG
+	assert(!result.first || std::all_of(std::begin(result.second), std::end(result.second), [&red_actions](const auto &op_id) { return red_actions[op_id.get_index()]; }));
+#endif
 //	return result.first ? result.second : plan;
 	return result.second;
 }
@@ -452,11 +484,14 @@ auto HierarchicalRedBlackSearchWrapper::get_rb_plan_repair_heuristic(const optio
 	plan_repair_options.set<bool>("paint_roots_black", false);
 	plan_repair_options.set<bool>("ignore_invertibility", false);
 	plan_repair_options.set<int>("prefs", 0);
-	plan_repair_options.set<bool>("applicable_paths_first", false);
-	plan_repair_options.set<bool>("next_red_action_test", false);
-	plan_repair_options.set<bool>("use_connected", false);
+	plan_repair_options.set<bool>("applicable_paths_first", true);
+	plan_repair_options.set<bool>("next_red_action_test", true);
+	plan_repair_options.set<bool>("use_connected", true);
 	plan_repair_options.set<bool>("extract_plan_no_blacks", false);
-	return std::make_shared<RedBlackDAGFactFollowingHeuristic>(plan_repair_options);
+	auto mercury_heuristic = std::make_shared<RedBlackDAGFactFollowingHeuristic>(plan_repair_options);
+	if (mercury_heuristic->get_num_black() == 0)
+		return nullptr;
+	return mercury_heuristic;
 }
 
 auto HierarchicalRedBlackSearchWrapper::get_rb_search_options(const options::Options &opts) -> options::Options {

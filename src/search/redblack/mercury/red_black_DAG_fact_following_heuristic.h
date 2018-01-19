@@ -141,8 +141,8 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 	void print_statistics() const;
 	void get_relaxed_plan(const GlobalState &state, relaxation_heuristic::Proposition *goal);
 
-	int get_semi_relaxed_plan_cost(const GlobalState &state, const std::vector<FactPair> &goal);
-	int add_red_black_plan_suffix(const GlobalState &state, const std::vector<FactPair> &goal, int h_val);
+	int get_semi_relaxed_plan_cost(const GlobalState &state, const std::vector<FactPair> &goal_facts);
+	int add_red_black_plan_suffix(const GlobalState &state, const std::vector<FactPair> &goal_facts, int h_val);
 	int get_next_action(bool skip_currently_red_inapplicable = false);
 
 	void prepare_for_red_fact_following();
@@ -214,7 +214,7 @@ private:
 	DtgOperators* get_dtg(int v) const { return dtgs_by_transition[v]; }
 	void free_mem();
 	void prepare_operators_for_counting_achieved_preconditions();
-	void reset_all_marks();
+	void reset_all_marks(const std::vector<FactPair> &goal_facts);
 	void set_new_marks_for_state(const GlobalState &state);
 	bool is_semi_relaxed_goal_reached(const std::vector<FactPair> &goal);
 	int resolve_conflicts(const GlobalState &state);
@@ -253,6 +253,8 @@ private:
 public:
 	RedBlackDAGFactFollowingHeuristic(const options::Options &options);
 	~RedBlackDAGFactFollowingHeuristic();
+
+	auto get_num_black() const -> int { return black_indices.size(); }
 
 	auto compute_semi_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
 

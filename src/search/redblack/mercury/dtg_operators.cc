@@ -130,6 +130,13 @@ void DtgOperators::postpone_sufficient_goal() {
 	red_sufficient_unachieved_iterators[goal_val] = red_sufficient_unachieved.insert(red_sufficient_unachieved.end(), goal_val);
 }
 
+void DtgOperators::add_current_goal(int goal) {
+	assert(use_sufficient_unachieved);
+	assert(goal_val == -1);
+
+	mark_as_sufficient(goal);
+}
+
 
 const list<int>& DtgOperators::get_sufficient_unachieved() const {
 	return red_sufficient_unachieved;

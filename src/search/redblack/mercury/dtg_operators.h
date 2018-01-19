@@ -137,6 +137,7 @@ public:
 	void clear_all_marks();
 	void clear_sufficient();
 	void mark_as_sufficient(int val);
+	void add_current_goal(int goal);
 	int num_sufficient_unachieved() const;
 	const list<int>& get_sufficient_unachieved() const;
 	// Heuristic moving the sufficient goal values to the end

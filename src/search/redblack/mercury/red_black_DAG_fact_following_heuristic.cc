@@ -97,9 +97,9 @@ void RedBlackDAGFactFollowingHeuristic::initialize() {
     }
 
 	// Setting goal values for all vars
-	for (int i=0; i < g_goal.size(); i++) {
-		get_dtg(g_goal[i].first)->set_goal_val(g_goal[i].second);
-	}
+//	for (int i=0; i < g_goal.size(); i++) {
+//		get_dtg(g_goal[i].first)->set_goal_val(g_goal[i].second);
+//	}
 
     check_connectivity();
 
@@ -975,13 +975,13 @@ void RedBlackDAGFactFollowingHeuristic::get_relaxed_plan(const GlobalState &stat
 }
 
 
-int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalState &state, const std::vector<FactPair> &goal) {
+int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalState &state, const std::vector<FactPair> &goal_facts) {
 	// Going over the actions in the set of relevant actions (default - relaxed plan), finding the one we want to apply next
 	// and either apply it, if applicable, or complete blacks and apply.
 	// A special case for all red values achieved is marked by returning -1 for the next action to apply
 	int h_rb = 0;
 
-	reset_all_marks();
+	reset_all_marks(goal_facts);
 	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
 	set_new_marks_for_state(state);
 
@@ -1004,11 +1004,11 @@ int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalSt
 			op_no = get_next_action();
 		}
 
-#ifdef DEBUG_RED_BLACK
+		#ifdef DEBUG_RED_BLACK
 		cout << "Next action index: " << op_no << endl;
 #endif
 		if (op_no == -1) {
-			return add_red_black_plan_suffix(state, goal, h_rb);
+			return add_red_black_plan_suffix(state, goal_facts, h_rb);
 		}
 
 #ifdef DEBUG_RED_BLACK
@@ -1100,7 +1100,7 @@ int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalSt
 }
 
 
-void RedBlackDAGFactFollowingHeuristic::reset_all_marks() {
+void RedBlackDAGFactFollowingHeuristic::reset_all_marks(const std::vector<FactPair> &goal_facts) {
 	// Clearing the dtgs marks for a new semi-relaxed plan
 	for (int v=0; v < g_variable_domain.size(); v++) {
 		get_dtg(v)->clear_all_marks();
@@ -1123,9 +1123,14 @@ void RedBlackDAGFactFollowingHeuristic::reset_all_marks() {
 			mark_red_sufficient(parallel_relaxed_plan[i][j]);
 
 	// Trying to postpone the goal value to the end
-	for (int ind = 0; ind < red_indices.size(); ind++) {
-		get_dtg(red_indices[ind])->postpone_sufficient_goal();
-	}
+	//for (int ind = 0; ind < red_indices.size(); ind++) {
+	//	get_dtg(red_indices[ind])->postpone_sufficient_goal();
+	//}
+
+	assert(std::is_sorted(std::begin(black_indices), std::end(black_indices)));
+	for (const auto &goal_fact : goal_facts)
+		if (!std::binary_search(std::begin(black_indices), std::end(black_indices), goal_fact.var))
+			get_dtg(goal_fact.var)->add_current_goal(goal_fact.value);
 }
 
 
@@ -1165,9 +1170,9 @@ void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const GlobalStat
 }
 
 
-int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const GlobalState &state, const std::vector<FactPair> &goal, int h_val) {
+int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const GlobalState &state, const std::vector<FactPair> &goal_facts, int h_val) {
 	// In case it does happen, this means that all red values are achieved, and now we need to achieve the black goal values
-	if (is_semi_relaxed_goal_reached(goal)) {
+	if (is_semi_relaxed_goal_reached(goal_facts)) {
 		return h_val;
 	}
 #ifdef DEBUG_RED_BLACK
@@ -1246,31 +1251,29 @@ int RedBlackDAGFactFollowingHeuristic::get_next_action(bool skip_black_pre_may_d
 			cout << val<< " (" << g_fact_names[var][val] << ")  ";
 #endif
 
-			int max_num_ops;
 			const vector<int> &ops = ops_by_eff[var][val];
-			max_num_ops = ops.size();
+			int max_num_ops = ops.size();
 			for (int o=0; o < max_num_ops; o++) {
 				int op_no = ops[o];
-				if (ops_checked[op_no]) {
+				if (ops_checked[op_no])
 					continue;
-				}
 
 				// Getting the conflict cost for op_no
 				ops_checked[op_no] = true;
 
+				if (!current_legal_operators[op_no])
+					continue;
+
 				///TEST!!!
-				if (skip_black_pre_may_delete_red_sufficient_achieved && achieving_black_pre_may_delete_achieved_red_sufficient(op_no)) {
+				if (skip_black_pre_may_delete_red_sufficient_achieved && achieving_black_pre_may_delete_achieved_red_sufficient(op_no))
 					continue;
-				}
-				if (!op_all_red_preconditions_reached(op_no)) {
+				if (!op_all_red_preconditions_reached(op_no))
 					continue;
-				}
 
 				int cost = get_operator_estimated_conflict_cost_black_reachability(op_no);
 
-				if (cost == -1) {
+				if (cost == -1)
 					continue;
-				}
 
 				// If there are no conflicts and the action is red-effects only, just return it
 				if (cost == 0 && is_red_effects_only_action(op_no)) {
