@@ -1127,9 +1127,8 @@ void RedBlackDAGFactFollowingHeuristic::reset_all_marks(const std::vector<FactPa
 	//	get_dtg(red_indices[ind])->postpone_sufficient_goal();
 	//}
 
-	assert(std::is_sorted(std::begin(black_indices), std::end(black_indices)));
 	for (const auto &goal_fact : goal_facts)
-		if (!std::binary_search(std::begin(black_indices), std::end(black_indices), goal_fact.var))
+		if (std::find(std::begin(black_indices), std::end(black_indices), goal_fact.var) == std::end(black_indices))
 			get_dtg(goal_fact.var)->add_current_goal(goal_fact.value);
 }
 
