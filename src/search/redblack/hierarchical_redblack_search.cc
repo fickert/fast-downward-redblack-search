@@ -33,7 +33,6 @@ HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &o
                                                        bool initial_state_is_preferred,
                                                        int initial_state_h_value)
 	: LazySearch<RBState, RBOperator>(opts, state_registry, search_space),
-	  repair_red_plans(opts.get<bool>("repair_red_plans")),
 	  plan_repair_heuristic(plan_repair_heuristic),
 	  red_actions_manager(red_actions_manager),
 	  is_current_preferred(initial_state_is_preferred),
@@ -92,7 +91,7 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 	if (rb_search_space_it == std::end(rb_search_spaces)) {
 		auto new_rb_data = std::make_shared<RBData>(painting);
 		auto new_state_registry = std::shared_ptr<RBStateRegistry>(new_rb_data->construct_state_registry(initial_state.get_values()));
-		auto new_red_actions_manager = repair_red_plans ? std::make_shared<RedActionsManager>(new_state_registry->get_operators()) : nullptr;
+		auto new_red_actions_manager = plan_repair_heuristic ? std::make_shared<RedActionsManager>(new_state_registry->get_operators()) : nullptr;
 		auto new_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*new_state_registry, static_cast<OperatorCost>(search_options.get_enum("cost_type")));
 		rb_search_space_it = rb_search_spaces.insert({painting.get_painting(), {new_rb_data, new_state_registry, new_red_actions_manager, new_search_space}}).first;
 		painting_is_new = true;
@@ -214,7 +213,7 @@ SearchStatus HierarchicalRedBlackSearch::step() {
 					goal_facts.reserve(g_goal.size());
 					std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
 					auto red_plan = get_red_plan(current_best_supporters, current_global_state, goal_facts);
-					if (repair_red_plans && !check_plan(current_global_state, red_plan, goal_facts))
+					if (plan_repair_heuristic && !check_plan(current_global_state, red_plan, goal_facts))
 						red_plan = get_repaired_plan(current_global_state, red_plan, goal_facts);
 					auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, goal_facts);
 					if (is_plan) {
@@ -268,7 +267,7 @@ void HierarchicalRedBlackSearch::generate_successors() {
 		assert(global_search_space.get_node(current_global_state).is_closed());
 
 		auto red_plan = get_red_plan(current_best_supporters, current_global_state, precondition_facts);
-		if (repair_red_plans && !check_plan(current_global_state, red_plan, precondition_facts))
+		if (plan_repair_heuristic && !check_plan(current_global_state, red_plan, precondition_facts))
 			red_plan = get_repaired_plan(current_global_state, red_plan, precondition_facts);
 		auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, precondition_facts);
 

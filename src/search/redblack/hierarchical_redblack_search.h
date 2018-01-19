@@ -54,7 +54,6 @@ protected:
 
 	auto get_hacked_cache_for_key(int key) const -> HeuristicCache<RBState, RBOperator>;
 
-	const bool repair_red_plans;
 	std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic;
 	std::shared_ptr<RedActionsManager> red_actions_manager;
 
