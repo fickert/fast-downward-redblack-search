@@ -56,8 +56,8 @@ auto get_no_red_conditional_effect_conditions_painting(const Painting &painting)
 	return Painting(new_painting);
 }
 
-void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan, const std::vector<FactPair> &goal_facts) {
 #ifndef NDEBUG
+void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan, const std::vector<FactPair> &goal_facts) {
 	auto current_achieved_values = std::vector<std::unordered_set<int>>(g_root_task()->get_num_variables());
 	for (auto i = 0; i < g_root_task()->get_num_variables(); ++i)
 		current_achieved_values[i].insert(state[i]);
@@ -82,8 +82,10 @@ void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<Opera
 	assert(std::all_of(std::begin(goal_facts), std::end(goal_facts), [&current_achieved_values](const auto &goal_fact) {
 		return current_achieved_values[goal_fact.var].find(goal_fact.value) != std::end(current_achieved_values[goal_fact.var]);
 	}));
-#endif
 }
+#else
+void debug_verify_relaxed_plan(const GlobalState &, const std::vector<OperatorID> &, const std::vector<FactPair> &) {}
+#endif
 
 auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts) -> std::vector<OperatorID> {
 	auto open = std::unordered_set<FactPair>();
