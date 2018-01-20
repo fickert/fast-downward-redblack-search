@@ -20,6 +20,22 @@ class Options;
 }
 
 namespace redblack {
+
+struct HierarchicalRedBlackSearchStatistics {
+	HierarchicalRedBlackSearchStatistics() :
+		num_openend_searches(0),
+		num_distinct_paintings(0),
+		num_failed_incomplete_searches(0),
+		max_num_black(0),
+		total_num_evaluations(0) {}
+
+	int num_openend_searches;
+	int num_distinct_paintings;
+	int num_failed_incomplete_searches;
+	int max_num_black;
+	int total_num_evaluations;
+};
+
 class IncrementalPaintingStrategy;
 
 class HierarchicalRedBlackSearch : public lazy_search::LazySearch<RBState, RBOperator> {
@@ -34,6 +50,7 @@ public:
 	                           std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
 	                           std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic,
 	                           std::shared_ptr<RedActionsManager> red_actions_manager,
+	                           HierarchicalRedBlackSearchStatistics &hierarchical_red_black_search_statistics,
 	                           int num_black,
 	                           bool initial_state_is_preferred = true,
 	                           int initial_state_h_value = 0);
@@ -82,9 +99,7 @@ protected:
 	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces;
 	const int num_black;
 
-	struct IncrementalRedBlackSearchStatistics {
-		IncrementalRedBlackSearchStatistics() {}
-	} hierarchical_redblack_search_statistics;
+	HierarchicalRedBlackSearchStatistics &hierarchical_red_black_search_statistics;
 };
 
 
@@ -95,6 +110,7 @@ public:
 	static void add_options_to_parser(options::OptionParser &);
 
 	SearchStatus step() override;
+	void print_rb_search_statistics() const;
 	void print_statistics() const override;
 
 protected:
@@ -106,6 +122,12 @@ protected:
 	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> rb_search_spaces;
 	const int num_black;
 
+	HierarchicalRedBlackSearchStatistics hierarchical_red_black_search_statistics;
+
+	// for periodic statistics output
+	utils::Timer search_timer;
+	const int statistics_interval;
+	double next_print_time;
 };
 }
 

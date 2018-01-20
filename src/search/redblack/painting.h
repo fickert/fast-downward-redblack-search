@@ -43,6 +43,10 @@ public:
 
 	auto get_painting() const -> const InternalPaintingType & { return painting; }
 
+	auto count_num_black() const -> int {
+		return std::count_if(std::begin(painting), std::end(painting), [](const auto is_red) { return !is_red; });
+	}
+
 	friend auto operator<<(std::ostream &out, const Painting &painting) -> std::ostream &;
 };
 
