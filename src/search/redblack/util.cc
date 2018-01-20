@@ -56,6 +56,35 @@ auto get_no_red_conditional_effect_conditions_painting(const Painting &painting)
 	return Painting(new_painting);
 }
 
+void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan, const std::vector<FactPair> &goal_facts) {
+#ifndef NDEBUG
+	auto current_achieved_values = std::vector<std::unordered_set<int>>(g_root_task()->get_num_variables());
+	for (auto i = 0; i < g_root_task()->get_num_variables(); ++i)
+		current_achieved_values[i].insert(state[i]);
+	auto open = relaxed_plan;
+	auto next_open = std::vector<OperatorID>();
+	while (!open.empty()) {
+		for (const auto op_id : open) {
+			const auto &op = g_operators[op_id.get_index()];
+			if (std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&current_achieved_values](const auto &precondition) {
+				return current_achieved_values[precondition.var].find(precondition.val) != std::end(current_achieved_values[precondition.var]);
+			})) {
+				for (const auto &effect : op.get_effects())
+					current_achieved_values[effect.var].insert(effect.val);
+			} else {
+				next_open.push_back(op_id);
+			}
+		}
+		assert(next_open.size() < open.size());
+		open = next_open;
+		next_open.clear();
+	}
+	assert(std::all_of(std::begin(goal_facts), std::end(goal_facts), [&current_achieved_values](const auto &goal_fact) {
+		return current_achieved_values[goal_fact.var].find(goal_fact.value) != std::end(current_achieved_values[goal_fact.var]);
+	}));
+#endif
+}
+
 auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts) -> std::vector<OperatorID> {
 	auto open = std::unordered_set<FactPair>();
 	for (const auto &goal_fact : goal_facts)
@@ -77,13 +106,12 @@ auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, c
 				for (const auto &precondition : supporter.get_preconditions())
 					if (state[precondition.var] != precondition.val)
 						next_open.emplace(precondition.var, precondition.val);
-				for (const auto &effect : supporter.get_effects())
-					this_phase_closed.emplace(effect.var, effect.val);
 			}
 		}
 		open = std::move(next_open);
 	}
 	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
+	//debug_verify_relaxed_plan(state, relaxed_plan, goal_facts);
 	return relaxed_plan;
 }
 }
