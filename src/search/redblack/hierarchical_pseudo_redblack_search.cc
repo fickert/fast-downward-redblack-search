@@ -1,4 +1,4 @@
-#include "hierarchical_redblack_search.h"
+#include "hierarchical_pseudo_redblack_search.h"
 
 #include "search_space.h"
 #include "util.h"
@@ -20,7 +20,7 @@ void verify_black_variable_values(const RBState &rb_state, const GlobalState &gl
 void verify_black_variable_values(const RBState &, const GlobalState &) {}
 #endif
 
-HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &opts,
+HierarchicalPseudoRedBlackSearch::HierarchicalPseudoRedBlackSearch(const options::Options &opts,
                                                        std::shared_ptr<RBStateRegistry> state_registry,
                                                        std::shared_ptr<SearchSpace<RBState, RBOperator>> search_space,
                                                        GlobalState current_initial_state,
@@ -29,7 +29,7 @@ HierarchicalRedBlackSearch::HierarchicalRedBlackSearch(const options::Options &o
                                                        std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
                                                        std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic,
                                                        std::shared_ptr<RedActionsManager> red_actions_manager,
-                                                       HierarchicalRedBlackSearchStatistics &hierarchical_red_black_search_statistics,
+                                                       HierarchicalPseudoRedBlackSearchStatistics &hierarchical_red_black_search_statistics,
                                                        int num_black,
                                                        bool initial_state_is_preferred,
                                                        int initial_state_h_value)
@@ -86,7 +86,7 @@ auto get_random_new_painting(const Painting &last_painting, int num_black) -> Pa
 	return get_no_red_conditional_effect_conditions_painting(Painting(next_painting));
 }
 
-void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, const GlobalState &initial_state, int key, bool preferred, EvaluationContext<RBState, RBOperator> &new_eval_context) {
+void HierarchicalPseudoRedBlackSearch::enqueue_new_search(const Painting &painting, const GlobalState &initial_state, int key, bool preferred, EvaluationContext<RBState, RBOperator> &new_eval_context) {
 	++hierarchical_red_black_search_statistics.num_openend_searches;
 	auto rb_search_space_it = rb_search_spaces.find(painting.get_painting());
 	auto painting_is_new = false;
@@ -102,7 +102,7 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 	}
 	assert(!initial_state.get_values().empty());
 	assert(rb_search_space_it != std::end(rb_search_spaces));
-	child_searches[current_state.get_id()].emplace_back(std::make_unique<HierarchicalRedBlackSearch>(
+	child_searches[current_state.get_id()].emplace_back(std::make_unique<HierarchicalPseudoRedBlackSearch>(
 		search_options, std::get<1>(rb_search_space_it->second), std::get<3>(rb_search_space_it->second),
 		initial_state, global_state_registry, global_search_space, rb_search_spaces, plan_repair_heuristic,
 		std::get<std::shared_ptr<RedActionsManager>>(rb_search_space_it->second), hierarchical_red_black_search_statistics, num_black, preferred, key));
@@ -118,7 +118,7 @@ void HierarchicalRedBlackSearch::enqueue_new_search(const Painting &painting, co
 	open_list->insert(new_eval_context, {current_state.get_id(), -static_cast<int>(child_searches.at(current_state.get_id()).size() - 1) - 1});
 }
 
-auto HierarchicalRedBlackSearch::get_hacked_cache_for_key(int key) const -> HeuristicCache<RBState, RBOperator> {
+auto HierarchicalPseudoRedBlackSearch::get_hacked_cache_for_key(int key) const -> HeuristicCache<RBState, RBOperator> {
 	auto hacked_eval_result = EvaluationResult();
 	hacked_eval_result.set_h_value(key);
 	// Note: the current_state in the cache is not always the intended state, but the open list doesn't care
@@ -128,7 +128,7 @@ auto HierarchicalRedBlackSearch::get_hacked_cache_for_key(int key) const -> Heur
 	return hacked_cache;
 }
 
-SearchStatus HierarchicalRedBlackSearch::step() {
+SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 	// Invariants:
 	// - current_state is the next state for which we want to compute the heuristic.
 	// - current_predecessor is a permanent pointer to the predecessor of that state.
@@ -255,7 +255,7 @@ SearchStatus HierarchicalRedBlackSearch::step() {
 	return fetch_next_state();
 }
 
-void HierarchicalRedBlackSearch::generate_successors() {
+void HierarchicalPseudoRedBlackSearch::generate_successors() {
 	ordered_set::OrderedSet<OperatorID> preferred_operators = collect_preferred_operators(current_eval_context, preferred_operator_heuristics);
 	if (randomize_successors)
 		preferred_operators.shuffle(*rng);
@@ -309,7 +309,7 @@ void HierarchicalRedBlackSearch::generate_successors() {
 	}
 }
 
-SearchStatus HierarchicalRedBlackSearch::fetch_next_state() {
+SearchStatus HierarchicalPseudoRedBlackSearch::fetch_next_state() {
 	if (open_list->empty()) {
 		std::cout << "Completely explored state space -- no solution!" << std::endl;
 		return FAILED;
@@ -358,7 +358,7 @@ SearchStatus HierarchicalRedBlackSearch::fetch_next_state() {
 	return IN_PROGRESS;
 }
 
-SearchStatus HierarchicalRedBlackSearchWrapper::step() {
+SearchStatus HierarchicalPseudoRedBlackSearchWrapper::step() {
 	auto status = root_search_engine->step();
 	// periodically print red black search statistics
 	if (statistics_interval != -1 && search_timer() > next_print_time) {
@@ -372,7 +372,7 @@ SearchStatus HierarchicalRedBlackSearchWrapper::step() {
 	return SOLVED;
 }
 
-void HierarchicalRedBlackSearchWrapper::print_rb_search_statistics() const {
+void HierarchicalPseudoRedBlackSearchWrapper::print_rb_search_statistics() const {
 	std::cout << "Number of openend searches: " << hierarchical_red_black_search_statistics.num_openend_searches << std::endl;
 	std::cout << "Number of distinct paintings: " << hierarchical_red_black_search_statistics.num_distinct_paintings << std::endl;
 	std::cout << "Number of failed (incomplete) searches: " << hierarchical_red_black_search_statistics.num_failed_incomplete_searches << std::endl;
@@ -382,13 +382,13 @@ void HierarchicalRedBlackSearchWrapper::print_rb_search_statistics() const {
 	std::cout << "Average evaluations per search: " << hierarchical_red_black_search_statistics.total_num_evaluations / static_cast<double>(hierarchical_red_black_search_statistics.num_openend_searches) << std::endl;
 }
 
-void HierarchicalRedBlackSearchWrapper::print_statistics() const {
+void HierarchicalPseudoRedBlackSearchWrapper::print_statistics() const {
 	print_rb_search_statistics();
 	statistics.print_detailed_statistics();
 	search_space->print_statistics();
 }
 
-auto HierarchicalRedBlackSearch::check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> bool {
+auto HierarchicalPseudoRedBlackSearch::check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> bool {
 	auto state_values = state.get_values();
 	auto is_currently_true = [&state_values](const auto &condition) { return state_values[condition.var] == condition.val; };
 	for (const auto &op_id : plan) {
@@ -402,7 +402,7 @@ auto HierarchicalRedBlackSearch::check_plan(const GlobalState &state, const std:
 	return std::all_of(std::begin(goal_facts), std::end(goal_facts), [&state_values](const auto &goal_fact) { return state_values[goal_fact.var] == goal_fact.value; });
 }
 
-auto HierarchicalRedBlackSearch::get_repaired_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) const -> std::vector<OperatorID> {
+auto HierarchicalPseudoRedBlackSearch::get_repaired_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) const -> std::vector<OperatorID> {
 #ifndef NDEBUG
 	auto red_actions = red_actions_manager.get()->get_red_actions_for_state(state);
 	for (auto i = 0u; i < g_operators.size(); ++i) {
@@ -446,7 +446,7 @@ auto HierarchicalRedBlackSearch::get_repaired_plan(const GlobalState &state, con
 	return result.second;
 }
 
-auto HierarchicalRedBlackSearch::update_search_space_and_check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState> {
+auto HierarchicalPseudoRedBlackSearch::update_search_space_and_check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState> {
 	auto current_state = state;
 	for (const auto op_id : plan) {
 		const auto &op = g_operators[op_id.get_index()];
@@ -468,16 +468,16 @@ auto HierarchicalRedBlackSearch::update_search_space_and_check_plan(const Global
 	return {std::all_of(std::begin(goal_facts), std::end(goal_facts), [&current_state](const auto &goal_fact) { return current_state[goal_fact.var] == goal_fact.value; }), current_state};
 }
 
-auto HierarchicalRedBlackSearch::get_current_key() const -> int {
+auto HierarchicalPseudoRedBlackSearch::get_current_key() const -> int {
 	return current_key;
 }
 
-auto HierarchicalRedBlackSearch::get_goal_state() const -> StateID {
+auto HierarchicalPseudoRedBlackSearch::get_goal_state() const -> StateID {
 	assert(global_goal_state != StateID::no_state);
 	return global_goal_state;
 }
 
-HierarchicalRedBlackSearchWrapper::HierarchicalRedBlackSearchWrapper(const options::Options &opts)
+HierarchicalPseudoRedBlackSearchWrapper::HierarchicalPseudoRedBlackSearchWrapper(const options::Options &opts)
 	: SearchEngine<GlobalState, GlobalOperator>(opts),
 	  root_search_engine(),
 	  rb_search_spaces(),
@@ -493,7 +493,7 @@ HierarchicalRedBlackSearchWrapper::HierarchicalRedBlackSearchWrapper(const optio
 	auto root_search_space = std::make_shared<SearchSpace<RBState, RBOperator>>(*root_state_registry, static_cast<OperatorCost>(rb_search_options.get_enum("cost_type")));
 	rb_search_spaces.insert({root_rb_data->painting.get_painting(), {root_rb_data, root_state_registry, root_red_actions_manager, root_search_space}});
 	auto plan_repair_heuristic = get_rb_plan_repair_heuristic(opts);
-	root_search_engine = std::make_unique<HierarchicalRedBlackSearch>(
+	root_search_engine = std::make_unique<HierarchicalPseudoRedBlackSearch>(
 		rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(),
 		*state_registry, *search_space, rb_search_spaces, plan_repair_heuristic, root_red_actions_manager,
 		hierarchical_red_black_search_statistics, num_black);
@@ -504,7 +504,7 @@ HierarchicalRedBlackSearchWrapper::HierarchicalRedBlackSearchWrapper(const optio
 	next_print_time = statistics_interval;
 }
 
-auto HierarchicalRedBlackSearchWrapper::get_rb_plan_repair_heuristic(const options::Options &opts) -> std::shared_ptr<RedBlackDAGFactFollowingHeuristic> {
+auto HierarchicalPseudoRedBlackSearchWrapper::get_rb_plan_repair_heuristic(const options::Options &opts) -> std::shared_ptr<RedBlackDAGFactFollowingHeuristic> {
 	if (!opts.get<bool>("repair_red_plans"))
 		return nullptr;
 	auto plan_repair_options = options::Options();
@@ -524,7 +524,7 @@ auto HierarchicalRedBlackSearchWrapper::get_rb_plan_repair_heuristic(const optio
 	return mercury_heuristic;
 }
 
-auto HierarchicalRedBlackSearchWrapper::get_rb_search_options(const options::Options &opts) -> options::Options {
+auto HierarchicalPseudoRedBlackSearchWrapper::get_rb_search_options(const options::Options &opts) -> options::Options {
 	auto rb_search_options = opts;
 	rb_search_options.set("evals", std::vector<Evaluator<RBState, RBOperator> *>{ opts.get<Heuristic<RBState, RBOperator> *>("heuristic") });
 	rb_search_options.set("preferred", std::vector<Heuristic<RBState, RBOperator> *>{ opts.get<Heuristic<RBState, RBOperator> *>("heuristic") });
@@ -538,7 +538,7 @@ auto HierarchicalRedBlackSearchWrapper::get_rb_search_options(const options::Opt
 	return rb_search_options;
 }
 
-void HierarchicalRedBlackSearchWrapper::add_options_to_parser(options::OptionParser &parser) {
+void HierarchicalPseudoRedBlackSearchWrapper::add_options_to_parser(options::OptionParser &parser) {
 	parser.add_option<std::shared_ptr<Painting>>("base_painting", "painting to be used in the initial red-black search", "all_red()");
 	parser.add_option<Heuristic<RBState, RBOperator> *>("heuristic", "red-black heuristic that will be passed to the underlying red-black search engine", "ff_rb(transform=adapt_costs(cost_type=1))");
 	parser.add_option<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy", "strategy for painting more variables black after finding a red-black solution with conflicts", "least_conflicts()");
@@ -550,13 +550,13 @@ void HierarchicalRedBlackSearchWrapper::add_options_to_parser(options::OptionPar
 
 static std::shared_ptr<SearchEngine<GlobalState, GlobalOperator>> _parse(options::OptionParser &parser) {
 	SearchEngine<GlobalState, GlobalOperator>::add_options_to_parser(parser);
-	HierarchicalRedBlackSearchWrapper::add_options_to_parser(parser);
+	HierarchicalPseudoRedBlackSearchWrapper::add_options_to_parser(parser);
 
 	auto opts = parser.parse();
 	if (parser.help_mode() || parser.dry_run())
 		return nullptr;
-	return std::make_shared<HierarchicalRedBlackSearchWrapper>(opts);
+	return std::make_shared<HierarchicalPseudoRedBlackSearchWrapper>(opts);
 }
 
-static options::PluginShared<SearchEngine<GlobalState, GlobalOperator>> _plugin("hierarchical_rb_search", _parse);
+static options::PluginShared<SearchEngine<GlobalState, GlobalOperator>> _plugin("hierarchical_pseudo_rb_search", _parse);
 }

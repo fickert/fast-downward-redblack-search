@@ -716,7 +716,7 @@ fast_downward_plugin(
     NAME REDBLACK
     HELP "Red-black state space search"
     SOURCES
-        redblack/hierarchical_redblack_search
+        redblack/hierarchical_pseudo_redblack_search
         redblack/incremental_painting_strategy
         redblack/incremental_redblack_search
         redblack/int_packer
@@ -728,7 +728,7 @@ fast_downward_plugin(
         redblack/rb_ff_heuristic
         redblack/rb_lazy_search
         redblack/rb_search_engine
-	redblack/red_actions_manager
+        redblack/red_actions_manager
         redblack/search_space
         redblack/state
         redblack/state_registry
