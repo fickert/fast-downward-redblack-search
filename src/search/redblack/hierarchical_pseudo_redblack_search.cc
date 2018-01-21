@@ -497,6 +497,8 @@ HierarchicalPseudoRedBlackSearchWrapper::HierarchicalPseudoRedBlackSearchWrapper
 		rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(),
 		*state_registry, *search_space, rb_search_spaces, plan_repair_heuristic, root_red_actions_manager,
 		hierarchical_red_black_search_statistics, num_black);
+	++hierarchical_red_black_search_statistics.num_openend_searches;
+	++hierarchical_red_black_search_statistics.num_distinct_paintings;
 	auto initial_node = search_space->get_node(state_registry->get_initial_state());
 	initial_node.open_initial();
 	initial_node.close();
