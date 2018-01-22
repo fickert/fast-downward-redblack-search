@@ -52,6 +52,7 @@ HierarchicalPseudoRedBlackSearch::HierarchicalPseudoRedBlackSearch(const options
 	  global_search_space(global_search_space),
 	  rb_search_spaces(rb_search_spaces),
 	  num_black(num_black),
+	  force_completeness(opts.get<bool>("force_completeness")),
 	  hierarchical_red_black_search_statistics(hierarchical_red_black_search_statistics) {
 	auto pref_operator_heuristics = search_options.get_list<Heuristic<RBState, RBOperator> *>("preferred");
 	set_pref_operator_heuristics(pref_operator_heuristics);
@@ -145,7 +146,7 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 			return SOLVED;
 		case FAILED: {
 			const auto &painting = static_cast<RBStateRegistry *>((**current_child_search).state_registry.get())->get_painting().get_painting();
-			if (std::none_of(std::begin(painting), std::end(painting), [](const auto is_red) { return is_red; })) {
+			if (!force_completeness || std::none_of(std::begin(painting), std::end(painting), [](const auto is_red) { return is_red; })) {
 				// all black painting ==> search space exhausted below this child search's initial state
 				current_child_search->reset();
 				break;
@@ -545,6 +546,7 @@ void HierarchicalPseudoRedBlackSearchWrapper::add_options_to_parser(options::Opt
 	parser.add_option<Heuristic<RBState, RBOperator> *>("heuristic", "red-black heuristic that will be passed to the underlying red-black search engine", "ff_rb(transform=adapt_costs(cost_type=1))");
 	parser.add_option<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy", "strategy for painting more variables black after finding a red-black solution with conflicts", "least_conflicts()");
 	parser.add_option<bool>("repair_red_plans", "attempt to repair red plans using Mercury", "true");
+	parser.add_option<bool>("force_completeness", "force completeness by generating random paintings in incomplete unsolved subsearches", "false");
 	parser.add_option<int>("statistics_interval", "Print statistics every x seconds. If this is set to -1, statistics will not be printed during search.", "30");
 	add_num_black_options(parser);
 	add_succ_order_options(parser);

@@ -99,6 +99,8 @@ protected:
 	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces;
 	const int num_black;
 
+	const bool force_completeness;
+
 	HierarchicalPseudoRedBlackSearchStatistics &hierarchical_red_black_search_statistics;
 };
 
