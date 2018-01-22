@@ -6,6 +6,8 @@
 #include "../search_engines/lazy_search.h"
 #include "operator.h"
 #include "rb_data.h"
+#include "mercury/red_black_DAG_fact_following_heuristic.h"
+#include "red_actions_manager.h"
 
 
 #ifdef _MSC_VER
@@ -35,7 +37,14 @@ protected:
 
 	void initialize_rb_search_engine();
 	void update_statistics();
-	auto update_search_space_and_check_plan(const RBPlan &plan) -> std::pair<bool, GlobalState>;
+	auto get_successor_and_update_search_space(const GlobalState& current_state, const GlobalOperator& op) -> GlobalState;
+	auto check_plan_and_update_search_space(const GlobalState& state, const std::vector<OperatorID>& plan, const std::vector<FactPair>& goal_facts) -> std::pair<bool, GlobalState>;
+	auto check_plan_and_update_search_space(const RBPlan &plan) -> std::pair<bool, GlobalState>;
+	auto repair_plan_and_update_search_space(const GlobalState& state,
+	                                                         const std::vector<FactPair>& goal_facts,
+	                                                         const std::vector<OperatorID>& partial_plan,
+	                                                         const boost::dynamic_bitset<>& red_actions) -> std::pair<bool, GlobalState>;
+	auto repair_plan_and_update_search_space(const RBPlan &plan) -> std::pair<bool, GlobalState>;
 
 	GlobalState current_initial_state;
 
@@ -58,8 +67,11 @@ protected:
 
 	// options
 	const bool continue_from_first_conflict;
+	std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic;
+	std::unique_ptr<RedActionsManager> red_actions_manager;
 
 	static auto get_rb_search_options(const options::Options &options) -> options::Options;
+	static auto get_rb_plan_repair_heuristic(const options::Options &options) -> std::shared_ptr<RedBlackDAGFactFollowingHeuristic>;
 };
 }
 
