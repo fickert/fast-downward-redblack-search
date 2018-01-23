@@ -255,6 +255,7 @@ public:
 	~RedBlackDAGFactFollowingHeuristic();
 
 	auto get_num_black() const -> int { return black_indices.size(); }
+	auto get_black_indices() const -> const std::vector<int> & { return black_indices; }
 
 	auto compute_semi_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
 

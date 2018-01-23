@@ -22,8 +22,8 @@ protected:
 	const int num_black;
 
 public:
-	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan) -> Painting;
-	virtual auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting = 0;
+	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<bool> *never_black_variables = nullptr) -> Painting;
+	virtual auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts, const std::vector<bool> *never_black_variables = nullptr) -> Painting = 0;
 
 	static void add_options_to_parser(options::OptionParser &parser);
 };
@@ -38,7 +38,7 @@ public:
 	LeastConflictsPaintingStrategy(const options::Options &opts);
 	~LeastConflictsPaintingStrategy() = default;
 
-	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting override;
+	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts, const std::vector<bool> *never_black_variables) -> Painting override;
 };
 
 
@@ -49,7 +49,7 @@ public:
 	RandomPaintingStrategy(const options::Options &opts);
 	~RandomPaintingStrategy() = default;
 
-	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts) -> Painting override;
+	auto generate_next_painting(const Painting &last_painting, const std::vector<OperatorID> &last_plan, const std::vector<FactPair> &goal_facts, const std::vector<bool> *never_black_variables) -> Painting override;
 };
 
 }

@@ -64,9 +64,9 @@ public:
 	static auto get_all_red_painting() -> InternalPaintingType;
 	static auto get_all_black_painting() -> InternalPaintingType;
 
+	static auto get_cg_leaves_painting() -> InternalPaintingType;
 protected:
 	const bool force_cg_leaves_red;
-	static auto get_cg_leaves_painting() -> InternalPaintingType;
 };
 
 

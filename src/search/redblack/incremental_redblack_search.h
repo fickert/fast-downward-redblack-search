@@ -72,6 +72,8 @@ protected:
 	std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic;
 	std::unique_ptr<RedActionsManager> red_actions_manager;
 
+	std::vector<bool> never_black_variables;
+
 	static auto get_rb_search_options(const options::Options &options) -> options::Options;
 	static auto get_rb_plan_repair_heuristic(const options::Options &options) -> std::shared_ptr<RedBlackDAGFactFollowingHeuristic>;
 };

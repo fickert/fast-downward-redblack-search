@@ -30,10 +30,14 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 	  incremental_painting_strategy(opts.get<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy")),
 	  continue_from_first_conflict(opts.get<bool>("continue_from_first_conflict")),
 	  plan_repair_heuristic(get_rb_plan_repair_heuristic(opts)),
-	  red_actions_manager() {
+	  red_actions_manager(),
+	  never_black_variables(PaintingFactory::get_cg_leaves_painting()) {
 	auto rb_state_registry = rb_data->construct_state_registry(g_initial_state_data);
-	if (plan_repair_heuristic)
+	if (plan_repair_heuristic) {
 		red_actions_manager = std::make_unique<RedActionsManager>(rb_state_registry->get_operators());
+		for (auto black_index : plan_repair_heuristic->get_black_indices())
+			never_black_variables[black_index] = true;
+	}
 	rb_search_engine = std::make_unique<InternalRBSearchEngine>(rb_search_engine_options, std::move(rb_state_registry));
 	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
 		[](auto b) { return !b; });
@@ -260,7 +264,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 	plan.reserve(rb_plan.size());
 	std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
 		[](const auto rb_operator) { return OperatorID(get_op_index_hacked(rb_operator)); });
-	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan));
+	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan, &never_black_variables));
 	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
 		[](auto b) { return !b; });
 	std::cout << "Red-black plan is not a real plan. Search continues with a new painting, "
