@@ -50,6 +50,7 @@ public:
 	                           std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> &rb_search_spaces,
 	                           std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic,
 	                           std::shared_ptr<RedActionsManager> red_actions_manager,
+	                           const std::vector<bool> &never_black_variables,
 	                           HierarchicalPseudoRedBlackSearchStatistics &hierarchical_red_black_search_statistics,
 	                           int num_black,
 	                           bool initial_state_is_preferred = true,
@@ -73,6 +74,8 @@ protected:
 
 	std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic;
 	std::shared_ptr<RedActionsManager> red_actions_manager;
+
+	const std::vector<bool> &never_black_variables;
 
 	bool is_current_preferred;
 	int current_key;
@@ -123,6 +126,8 @@ protected:
 	std::unique_ptr<HierarchicalPseudoRedBlackSearch> root_search_engine;
 	std::map<InternalPaintingType, std::tuple<std::shared_ptr<RBData>, std::shared_ptr<RBStateRegistry>, std::shared_ptr<RedActionsManager>, std::shared_ptr<SearchSpace<RBState, RBOperator>>>> rb_search_spaces;
 	const int num_black;
+
+	std::vector<bool> never_black_variables;
 
 	HierarchicalPseudoRedBlackSearchStatistics hierarchical_red_black_search_statistics;
 
