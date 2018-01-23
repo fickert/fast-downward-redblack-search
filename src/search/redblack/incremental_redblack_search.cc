@@ -109,13 +109,15 @@ auto IncrementalRedBlackSearch::repair_plan_and_update_search_space(const Global
 		achieved_facts[i].resize(g_root_task()->get_variable_domain_size(i));
 		achieved_facts[i].set(state[i]);
 	}
-	// TODO: this assumes that the relaxed plan is applicable in the given order which may not be guaranteed
+	// NOTE: this assumes that the relaxed plan is applicable in the given order which may not be guaranteed
 	for (const auto &op_id : partial_plan) {
 		const auto &op = g_operators[op_id.get_index()];
 		if (!std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&achieved_facts](const auto &precondition) {
 			return achieved_facts[precondition.var][precondition.val];
-		}))
+		})) {
+			++incremental_redblack_search_statistics.num_broken_red_plans;
 			return check_plan_and_update_search_space(state, partial_plan, goal_facts);
+		}
 		for (const auto &effect : op.get_effects())
 			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), [&achieved_facts](const auto &condition) {
 				return achieved_facts[condition.var][condition.val];
@@ -124,8 +126,10 @@ auto IncrementalRedBlackSearch::repair_plan_and_update_search_space(const Global
 	}
 	if (!std::all_of(std::begin(goal_facts), std::end(goal_facts), [&achieved_facts](const auto &goal_fact) {
 		return achieved_facts[goal_fact.var][goal_fact.value];
-	}))
+	})) {
+		++incremental_redblack_search_statistics.num_broken_red_plans;
 		return check_plan_and_update_search_space(state, partial_plan, goal_facts);
+	}
 	// now that we made sure the relaxed plan is valid relaxed plan, attempt to repair it
 	auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(state, goal_facts, partial_plan, red_actions);
 	return repaired ?
@@ -281,6 +285,7 @@ void IncrementalRedBlackSearch::print_statistics() const {
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 	std::cout << "Performed " << incremental_redblack_search_statistics.num_episodes << " episodes of red-black search." << std::endl;
 	std::cout << "Search was restarted " << incremental_redblack_search_statistics.num_restarts << " times after red-black search failed to find a solution." << std::endl;
+	std::cout << "Number of broken red plans: " << incremental_redblack_search_statistics.num_broken_red_plans << std::endl;
 	statistics.print_detailed_statistics();
 	search_space->print_statistics();
 }
