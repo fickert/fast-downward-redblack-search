@@ -6,9 +6,9 @@
 #include "graph_algorithms/scc.h"
 #include "graph_algorithms/topological_sort.h"
 
-#include <time.h>
+#include <ctime>
 #include <cstdlib>
-#include <stdio.h>
+#include <cstdio>
 #include <iostream>
 
 using namespace std;
@@ -21,7 +21,7 @@ using namespace std;
 
 RedBlackDAGFactFollowingHeuristic::RedBlackDAGFactFollowingHeuristic(const Options &opts)
     : additive_heuristic::AdditiveHeuristic<GlobalState, GlobalOperator>(opts), extract_plan(opts.get<bool>("extract_plan")), solution_found(false), suffix_plan(), applicability_status(false)
-	, num_invertible_vars(0), shortest_paths_calculated(false), use_black_dag(false) {
+	, num_invertible_vars(0), shortest_paths_calculated(false), use_black_dag(false), current_outside_red_variables(nullptr) {
 	ignore_invertibility = opts.get<bool>("ignore_invertibility");
 	preferred_type = PreferredOpsType(opts.get_enum("prefs"));
 
@@ -29,11 +29,11 @@ RedBlackDAGFactFollowingHeuristic::RedBlackDAGFactFollowingHeuristic(const Optio
 
 	applicable_paths_first = opts.get<bool>("applicable_paths_first");
 	if (applicable_paths_first)
-		black_state_buffer = std::vector<int>(g_root_task()->get_num_variables());
+		black_state_buffer = std::vector<std::vector<int>>(g_root_task()->get_num_variables());
 
 	use_connected = opts.get<bool>("use_connected");
 	if (use_connected)
-		connected_state_buffer = std::vector<int>(g_root_task()->get_num_variables());
+		connected_state_buffer = std::vector<std::vector<int>>(g_root_task()->get_num_variables());
 
 	next_red_action_test = opts.get<bool>("next_red_action_test");
 
@@ -43,7 +43,7 @@ RedBlackDAGFactFollowingHeuristic::RedBlackDAGFactFollowingHeuristic(const Optio
 	}
 	// Extract plan when FF is used
 	extract_plan_no_blacks = opts.get<bool>("extract_plan_no_blacks");
-	this->initialize();
+	RedBlackDAGFactFollowingHeuristic::initialize();
 }
 
 RedBlackDAGFactFollowingHeuristic::~RedBlackDAGFactFollowingHeuristic() {
@@ -253,7 +253,7 @@ auto RedBlackDAGFactFollowingHeuristic::ff_compute_heuristic(const GlobalState &
     if (extract_plan) {
     	// Added check for applicability of the found plan
     	for (size_t i = 0; i < g_variable_domain.size(); i++) {
-    		curr_state_buffer[i] = state[i];
+			curr_state_buffer[i] = {state[i]};
     	}
         apply_while_possible();
     }
@@ -975,15 +975,11 @@ void RedBlackDAGFactFollowingHeuristic::get_relaxed_plan(const GlobalState &stat
 }
 
 
-int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalState &state, const std::vector<FactPair> &goal_facts) {
+int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const std::vector<FactPair> &goal_facts) {
 	// Going over the actions in the set of relevant actions (default - relaxed plan), finding the one we want to apply next
 	// and either apply it, if applicable, or complete blacks and apply.
 	// A special case for all red values achieved is marked by returning -1 for the next action to apply
 	int h_rb = 0;
-
-	reset_all_marks(goal_facts);
-	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
-	set_new_marks_for_state(state);
 
 #ifdef DEBUG_RED_BLACK
 	cout << "Getting the next action for red-black plan" << endl;
@@ -1008,7 +1004,7 @@ int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalSt
 		cout << "Next action index: " << op_no << endl;
 #endif
 		if (op_no == -1) {
-			return add_red_black_plan_suffix(state, goal_facts, h_rb);
+			return add_red_black_plan_suffix(goal_facts, h_rb);
 		}
 
 #ifdef DEBUG_RED_BLACK
@@ -1025,7 +1021,7 @@ int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalSt
 			//h_rb += get_adjusted_cost(*op);
 			h_rb += 1;
 			// Set as preferred
-			set_op_as_preferred(state, op_no, true);
+			//set_op_as_preferred(state, op_no, true);
 
 			if (extract_plan) {
 				// Check global applicability and apply
@@ -1055,7 +1051,7 @@ int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalSt
 #endif
 
 		// Otherwise, collect the costs from the black dtgs (the missing part is already marked in the relevant dtgs)
-		int conflict_cost = resolve_conflicts(state);
+		int conflict_cost = resolve_conflicts();
 		if (conflict_cost == DEAD_END)
 			return DEAD_END;
 
@@ -1071,7 +1067,7 @@ int RedBlackDAGFactFollowingHeuristic::get_semi_relaxed_plan_cost(const GlobalSt
 			//h_rb += get_adjusted_cost(*op);
 			h_rb += 1;
 			// Set as preferred
-			set_op_as_preferred(state, op_no, true);
+			//set_op_as_preferred(state, op_no, true);
 
 			if (extract_plan) {
 				// Check global applicability and apply
@@ -1168,8 +1164,36 @@ void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const GlobalStat
 	update_marks();
 }
 
+void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const std::vector<FactPair> &facts) {
+	// Marking achieved by the state vals
+	for (const auto &fact : facts) {
+		auto is_black = black_vars[fact.var];
+		auto &dtg = *get_dtg(fact.var);
+		dtg.mark_achieved_val(fact.value, is_black);
+		if (is_black)
+			dtg.mark_as_reachable(fact.value);
+		else
+			mark_red_precondition(fact.var, fact.value);
+	}
+	// TODO: very strange...
+	//red_sufficient_unachieved_iterators.reserve(g_variable_domain.size());
+	red_sufficient_unachieved.clear();
 
-int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const GlobalState &state, const std::vector<FactPair> &goal_facts, int h_val) {
+	for (int ind = 0; ind < red_indices.size(); ind++) {
+		int var = red_indices[ind];
+		// Check whether there are sufficient unachieved values for this red, if so adding it to the list
+		if (0 < get_dtg(var)->num_sufficient_unachieved()) {
+			// TODO: very strange...
+			//red_sufficient_unachieved_iterators[var] = red_sufficient_unachieved.insert(red_sufficient_unachieved.end(), var);
+			red_sufficient_unachieved.insert(red_sufficient_unachieved.end(), var);
+		}
+	}
+	// After red are marked, we can now update the black reachable values
+	update_marks();
+}
+
+
+int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const std::vector<FactPair> &goal_facts, int h_val) {
 	// In case it does happen, this means that all red values are achieved, and now we need to achieve the black goal values
 	if (is_semi_relaxed_goal_reached(goal_facts)) {
 		return h_val;
@@ -1180,7 +1204,7 @@ int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const GlobalSta
 #endif
 
 	// Otherwise, collect the costs from the black dtgs (the missing part is already marked in the relevant dtgs)
-	int conflict_cost = resolve_conflicts(state);
+	int conflict_cost = resolve_conflicts();
 
 	if (conflict_cost == DEAD_END) {
 		return DEAD_END;
@@ -1401,15 +1425,15 @@ bool RedBlackDAGFactFollowingHeuristic::is_currently_mixed_effects(int op_no) co
 }
 
 
-int RedBlackDAGFactFollowingHeuristic::resolve_conflicts(const GlobalState &state) {
+int RedBlackDAGFactFollowingHeuristic::resolve_conflicts() {
 	if (!use_black_dag)
-		return resolve_conflicts_disconnected(state);
+		return resolve_conflicts_disconnected();
 
-	return resolve_conflicts_DAG(state);
+	return resolve_conflicts_DAG();
 }
 
 
-int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_disconnected(const GlobalState &state) {
+int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_disconnected() {
 	// Returns the cost of resolving conflicts, while applying black changing actions
 	// Returns DEAD_END if there is no way of resolving the conflicts. This can happen when running with ignoring invertibility
 	int black_part = 0;
@@ -1464,7 +1488,7 @@ int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_disconnected(const Glob
 #endif
 
 			// Set as preferred
-			set_op_as_preferred(state, op_no, false);
+			//set_op_as_preferred(state, op_no, false);
 
 			if (extract_plan) {
 				// Check global applicability and apply
@@ -1574,26 +1598,35 @@ const vector<int>& RedBlackDAGFactFollowingHeuristic::get_path_for_var(int var) 
 	    	int pre_var = (*it).first;
 
 			// Adding the sequence of values that moves the red connected var to its precondition
-			int from_val = connected_state_buffer[pre_var];
+			const std::vector<int> &from_vals = connected_state_buffer[pre_var];
 			int to_val = (*it).second;
 #ifdef DEBUG_RED_BLACK
 			cout << "Current red value is " << from_val << " and the needed value is " << to_val << endl;
 #endif
-
-			if (from_val == to_val)
+			assert(std::is_sorted(std::begin(from_vals), std::end(from_vals)));
+			if (std::binary_search(std::begin(from_vals), std::end(from_vals), to_val))
 				continue;
 
 #ifdef DEBUG_RED_BLACK
 			cout << "Getting the shortest path for the red var." << endl;
 #endif
-			const vector<int>& pre_ops = get_dtg(pre_var)->calculate_shortest_path_from_to(from_val, to_val);
+			const vector<int>& pre_ops = from_vals.size() == 1 ?
+				get_dtg(pre_var)->calculate_shortest_path_from_to(from_vals.front(), to_val) :
+				get_dtg(pre_var)->calculate_shortest_path_from_to(from_vals, to_val);
 #ifdef CRITICAL_RED_BLACK
 			if (pre_ops.size() == 0) {
 				cout << "Bug! Has to be a path that does not change any other value!" << endl;
 				exit_with(EXIT_CRITICAL_ERROR);
 			}
 #endif
-			connected_state_buffer[pre_var] = to_val;
+			if (!current_outside_red_variables || !current_outside_red_variables->at(pre_var)) {
+				connected_state_buffer[pre_var] = {to_val};
+			} else {
+				connected_state_buffer[pre_var].push_back(to_val);
+				std::inplace_merge(std::begin(connected_state_buffer[pre_var]),
+				                   std::end(connected_state_buffer[pre_var]) - 1,
+				                   std::end(connected_state_buffer[pre_var]));
+			}
 #ifdef DEBUG_RED_BLACK
 			cout << "Pushing the path to the end of the sequence." << endl;
 #endif
@@ -1617,7 +1650,7 @@ const vector<int>& RedBlackDAGFactFollowingHeuristic::get_path_for_var(int var) 
 }
 
 
-int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_DAG(const GlobalState &state) {
+int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_DAG() {
 	// Returns the cost of resolving conflicts, while applying black changing actions
 	// Should never return DEAD_END!
 	// A planning task should be constructed and solved here. The actions of the planning task are those that are relaxed applicable
@@ -1667,7 +1700,7 @@ int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_DAG(const GlobalState &
 			//black_part += get_adjusted_cost(*op);
 			black_part += 1;
 			// Set as preferred
-			set_op_as_preferred(state, op_no, true);
+			//set_op_as_preferred(state, op_no, true);
 
 			if (extract_plan) {
 				// Check global applicability and apply
@@ -1777,7 +1810,7 @@ void RedBlackDAGFactFollowingHeuristic::apply_action_to_current_state(int op_no)
 		g_operators[op_no].dump();
 #endif
 	suffix_plan.push_back(&g_operators[op_no]);
-	get_rb_sas_operator(op_no)->apply(curr_state_buffer);
+	get_rb_sas_operator(op_no)->apply(curr_state_buffer, current_outside_red_variables);
 }
 
 
@@ -1906,10 +1939,14 @@ auto RedBlackDAGFactFollowingHeuristic::compute_semi_relaxed_plan(const GlobalSt
 		solution_found = false;
 
 		for (int i = 0; i < g_variable_domain.size(); i++)
-			curr_state_buffer[i] = state[i];
+			curr_state_buffer[i] = {state[i]};
 	}
 
-	int res = get_semi_relaxed_plan_cost(state, goal_facts);
+	reset_all_marks(goal_facts);
+	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
+	set_new_marks_for_state(state);
+
+	int res = get_semi_relaxed_plan_cost(goal_facts);
 
 	// Replaced with the following:
 	if (res != DEAD_END && test_goal_for_int_vector(curr_state_buffer, goal_facts)) {
@@ -1926,9 +1963,72 @@ auto RedBlackDAGFactFollowingHeuristic::compute_semi_relaxed_plan(const GlobalSt
 	remove_all_operators_from_parallel_relaxed_plan();
 
 	return {false, {}};
+}
 
+auto RedBlackDAGFactFollowingHeuristic::compute_semi_relaxed_plan(
+	const std::vector<FactPair> &available_facts,
+	const std::vector<bool> &outside_red_variables,
+	const std::vector<FactPair> &goal_facts,
+	const std::vector<OperatorID> &base_relaxed_plan,
+	const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<
+OperatorID>> {
+	assert(std::is_sorted(std::begin(available_facts), std::end(available_facts)));
+	if (std::all_of(std::begin(goal_facts), std::end(goal_facts), [&available_facts](const auto &goal_fact) {
+		return std::binary_search(std::begin(available_facts), std::end(available_facts), goal_fact); }))
+		return {true, {}};
+	assert(black_indices.size() > 0);
+	assert(extract_plan);
+
+	current_outside_red_variables = &outside_red_variables;
+	current_legal_operators = legal_operators;
+
+	parallel_relaxed_plan.resize(base_relaxed_plan.size(), {});
+	for (auto i = 0u; i < base_relaxed_plan.size(); ++i)
+		parallel_relaxed_plan[i] = {base_relaxed_plan[i].get_index()};
+
+	// Added check for applicability of the found plan
+	if (extract_plan) {
+		applicability_status = true;
+		suffix_plan.clear();
+		solution_found = false;
+
+		for (auto &buffer : curr_state_buffer)
+			buffer.clear();
+	
+		for (const auto &fact : available_facts)
+			curr_state_buffer[fact.var].push_back(fact.value);
+#ifndef NDEBUG
+		for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
+			assert(!curr_state_buffer[var].empty());
+			assert(outside_red_variables[var] || curr_state_buffer[var].size() == 1);
+		}
+#endif
+
+	}
+
+	reset_all_marks(goal_facts);
+	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
+	set_new_marks_for_state(available_facts);
+
+	int res = get_semi_relaxed_plan_cost(goal_facts);
+
+	// Replaced with the following:
+	if (res != DEAD_END && test_goal_for_int_vector(curr_state_buffer, goal_facts)) {
+		assert(!suffix_plan.empty() || relaxed_plan.empty());
+		auto fixed_plan = std::vector<OperatorID>();
+		fixed_plan.reserve(suffix_plan.size());
+		std::transform(std::begin(suffix_plan), std::end(suffix_plan), std::back_inserter(fixed_plan), [](const auto op) { return OperatorID(get_op_index_hacked(op)); });
+		// Clearing the marking for the next state computation
+		remove_all_operators_from_parallel_relaxed_plan();
+		current_outside_red_variables = nullptr;
+
+		return {true, fixed_plan};
+	}
 	// Clearing the marking for the next state computation
 	remove_all_operators_from_parallel_relaxed_plan();
+	current_outside_red_variables = nullptr;
+
+	return {false, {}};
 }
 
 int RedBlackDAGFactFollowingHeuristic::compute_heuristic(const GlobalState &state) {
@@ -1960,7 +2060,7 @@ int RedBlackDAGFactFollowingHeuristic::compute_heuristic(const GlobalState &stat
     	solution_found = false;
 
     	for (int i = 0; i < g_variable_domain.size(); i++)
-    		curr_state_buffer[i] = state[i];
+			curr_state_buffer[i] = {state[i]};
     }
     // Removing the empty layers, for faster future computation (hopefully). Need to check!!!
     for (int i=parallel_relaxed_plan.size()-1; i >= 0; i--) {
@@ -1972,7 +2072,12 @@ int RedBlackDAGFactFollowingHeuristic::compute_heuristic(const GlobalState &stat
 	goal_facts.reserve(g_goal.size());
 	for (const auto &goal : g_goal)
 		goal_facts.emplace_back(goal.first, goal.second);
-    int res = get_semi_relaxed_plan_cost(state, goal_facts);
+
+	reset_all_marks(goal_facts);
+	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
+	set_new_marks_for_state(state);
+
+    int res = get_semi_relaxed_plan_cost(goal_facts);
 
     // Replaced with the following:
     if (res != DEAD_END && extract_plan) {
@@ -2259,7 +2364,7 @@ bool RedBlackDAGFactFollowingHeuristic::is_currently_applicable(const vector<int
 		if (!get_rb_sas_operator(op_no)->is_applicable(black_state_buffer))
 			return false;
 
-		get_rb_sas_operator(op_no)->apply(black_state_buffer);
+		get_rb_sas_operator(op_no)->apply(black_state_buffer, current_outside_red_variables);
 		op_no = ops[i];
 	}
 	// checking the last op without applying

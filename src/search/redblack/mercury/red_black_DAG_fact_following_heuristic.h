@@ -44,16 +44,18 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 	ParallelRelaxedPlan parallel_relaxed_plan;
 
 	// Patrick: copied from Michael: For checking overall applicability
-	std::vector<int> curr_state_buffer;
+	std::vector<std::vector<int>> curr_state_buffer;
 	bool applicability_status;
 	bool solution_found;
 	bool extract_plan;
 
-	bool test_goal_for_int_vector(const std::vector<int>& state, const std::vector<FactPair> &goal) {
+	const std::vector<bool> *current_outside_red_variables;
+
+	bool test_goal_for_int_vector(const std::vector<std::vector<int>>& state, const std::vector<FactPair> &goal) {
 		for (size_t i = 0; i < goal.size(); ++i) {
-			if (state[goal[i].var] != goal[i].value) {
+			assert(std::is_sorted(std::begin(state[goal[i].var]), std::end(state[goal[i].var])));
+			if (!std::binary_search(std::begin(state[goal[i].var]), std::end(state[goal[i].var]), goal[i].value))
 				return false;
-			}
 		}
 		return true;
 	}
@@ -64,18 +66,26 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 			solution_found = true;
 		}
 	}
-	bool is_op_applicable(const GlobalOperator *op, const std::vector<int>& state) const {
+	bool is_op_applicable(const GlobalOperator *op, const std::vector<std::vector<int>>& state) const {
 		for (size_t i = 0; i < op->get_preconditions().size(); ++i) {
 			const GlobalCondition &precondition = op->get_preconditions()[i];
 			// return false if not applicable
-			if (precondition.val != state[precondition.var])
+			if (!std::binary_search(std::begin(state[precondition.var]), std::end(state[precondition.var]), precondition.val))
 				return false;
 		}
 		return true;
 	}
-	void apply_op(const GlobalOperator *op, std::vector<int>& state) const {
-		for (size_t i = 0; i < op->get_effects().size(); i++)
-			state[op->get_effects()[i].var] = op->get_effects()[i].val;
+	void apply_op(const GlobalOperator *op, std::vector<std::vector<int>>& state) const {
+		for (size_t i = 0; i < op->get_effects().size(); i++) {
+			if (!current_outside_red_variables || !current_outside_red_variables->at(op->get_effects()[i].var)) {
+				state[op->get_effects()[i].var] = {op->get_effects()[i].val};
+			} else {
+				state[op->get_effects()[i].var].push_back(op->get_effects()[i].val);
+				std::inplace_merge(std::begin(state[op->get_effects()[i].var]),
+				                   std::end(state[op->get_effects()[i].var]) - 1,
+				                   std::end(state[op->get_effects()[i].var]));
+			}
+		}
 	}
 
 	void mark_preferred_operators_and_relaxed_plan(const GlobalState &state, relaxation_heuristic::Proposition *goal);
@@ -106,8 +116,8 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 
 	bool next_red_action_test;
 	bool use_connected;
-	std::vector<int> connected_state_buffer;
-	std::vector<int> black_state_buffer;
+	std::vector<std::vector<int>> connected_state_buffer;
+	std::vector<std::vector<int>> black_state_buffer;
 
 	// Keeping operators by pre for red variables only.
 	vector<vector<vector<int> > > ops_by_pre;
@@ -141,8 +151,8 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 	void print_statistics() const;
 	void get_relaxed_plan(const GlobalState &state, relaxation_heuristic::Proposition *goal);
 
-	int get_semi_relaxed_plan_cost(const GlobalState &state, const std::vector<FactPair> &goal_facts);
-	int add_red_black_plan_suffix(const GlobalState &state, const std::vector<FactPair> &goal_facts, int h_val);
+	int get_semi_relaxed_plan_cost(const std::vector<FactPair> &goal_facts);
+	int add_red_black_plan_suffix(const std::vector<FactPair> &goal_facts, int h_val);
 	int get_next_action(bool skip_currently_red_inapplicable = false);
 
 	void prepare_for_red_fact_following();
@@ -195,8 +205,8 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 	vector<list<int>::iterator> red_sufficient_unachieved_iterators;
 	int get_operator_estimated_conflict_cost_black_reachability(int op_no) const;
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-	int resolve_conflicts_disconnected(const GlobalState &state);
-	int resolve_conflicts_DAG(const GlobalState &state);
+	int resolve_conflicts_disconnected();
+	int resolve_conflicts_DAG();
 
 	void add_path_for_var_from_to(int var, int from, int to, vector<int>& curr_sequence);
 	const vector<int>& get_path_for_var_from_to(int var, int from, int to) const;
@@ -216,8 +226,9 @@ private:
 	void prepare_operators_for_counting_achieved_preconditions();
 	void reset_all_marks(const std::vector<FactPair> &goal_facts);
 	void set_new_marks_for_state(const GlobalState &state);
+	void set_new_marks_for_state(const std::vector<FactPair> &facts);
 	bool is_semi_relaxed_goal_reached(const std::vector<FactPair> &goal);
-	int resolve_conflicts(const GlobalState &state);
+	int resolve_conflicts();
 
 	RedBlackOperator* get_rb_sas_operator(int op_no) const { return red_black_sas_operators[op_no]; }
 
@@ -258,6 +269,7 @@ public:
 	auto get_black_indices() const -> const std::vector<int> & { return black_indices; }
 
 	auto compute_semi_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
+	auto compute_semi_relaxed_plan(const std::vector<FactPair> &available_facts, const std::vector<bool> &outside_red_variables, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
 
     static void add_options_to_parser(options::OptionParser &parser);
 

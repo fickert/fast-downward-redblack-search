@@ -775,6 +775,39 @@ const vector<int>& DtgOperators::calculate_shortest_path_from_to(int from, int t
 	return plan;
 }
 
+const vector<int> & DtgOperators::calculate_shortest_path_from_to(
+	const std::vector<int> &from, int to) {
+	assert(to >= 0 && to < range);
+	assert(!is_root);
+
+#ifdef DEBUG_RED_BLACK
+	//cout << "Calculating the shortest path from " << g_fact_names[var][from] << " to " << g_fact_names[var][to] << endl;
+#endif
+
+	std::fill_n(dijkstra_distance, range, numeric_limits<int>::max());
+	priority_queues::AdaptiveQueue<int> queue;
+	for (const auto from_val : from) {
+		dijkstra_distance[from_val] = 0;
+		dijkstra_ops[from_val] = -1;
+		dijkstra_prev[from_val] = -1;
+		queue.push(solution[from_val][to], from_val);
+	}
+
+	astar_search(queue, to);
+
+#ifdef DEBUG_RED_BLACK
+	cout << "Done calculating, the value is " << dijkstra_distance[to] << endl;
+#endif
+	plan.clear();
+
+	if (dijkstra_distance[to] == numeric_limits<int>::max()) {
+		return plan;
+	}
+	// Restoring the path from ops
+	restore_path_from_dijkstra_ops(to, plan);
+	return plan;
+}
+
 const vector<int>& DtgOperators::calculate_shortest_path_to(int to) {
 	return calculate_shortest_path_from_to(current_value, to);
 }

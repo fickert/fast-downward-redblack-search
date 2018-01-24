@@ -28,10 +28,10 @@ public:
 	const partial_assignment& get_black_effect() const { return black_effect;}
 
 
-	bool is_red_applicable(const std::vector<int> &values) const;
-	bool is_applicable(const std::vector<int> &values) const;
+	bool is_red_applicable(const std::vector<std::vector<int>> &values) const;
+	bool is_applicable(const std::vector<std::vector<int>> &values) const;
 	bool is_applicable(const GlobalState& state) const;
-	void apply(std::vector<int> &values) const;
+	void apply(std::vector<std::vector<int>> &values, const std::vector<bool> *outside_red_variables) const;
 	void dump() const;
 	int get_op_no() const { return op_no; }
 };

@@ -161,6 +161,7 @@ public:
 	const vector<int>& calculate_shortest_path();
 	const vector<int>& calculate_shortest_path(const vector<int>& values);
 	const vector<int>& calculate_shortest_path_from_to(int from, int to);
+	const vector<int>& calculate_shortest_path_from_to(const std::vector<int> &from, int to);
 	const vector<int>& calculate_shortest_path_to(int to);
 
 	const vector<int>& get_current_shortest_path() const { return plan; }

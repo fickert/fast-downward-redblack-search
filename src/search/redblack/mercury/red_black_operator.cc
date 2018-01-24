@@ -48,21 +48,21 @@ void RedBlackOperator::set_black_pre_eff(const vector<bool>& black_vars) {
 
 }
 
-bool RedBlackOperator::is_red_applicable(const std::vector<int> &values) const {
+bool RedBlackOperator::is_red_applicable(const std::vector<std::vector<int>> &values) const {
 	for (partial_assignment::iterator it=red_precondition.begin(); it != red_precondition.end(); it++) {
-		if (values[(*it).first] != (*it).second)
+		if (!std::binary_search(std::begin(values[it->first]), std::end(values[it->first]), it->second))
 			return false;
 	}
 	return true;
 }
 
-bool RedBlackOperator::is_applicable(const std::vector<int> &values) const {
+bool RedBlackOperator::is_applicable(const std::vector<std::vector<int>> &values) const {
 	for (partial_assignment::iterator it = red_precondition.begin(); it != red_precondition.end(); it++) {
-		if (values[(*it).first] != (*it).second)
+		if (!std::binary_search(std::begin(values[it->first]), std::end(values[it->first]), it->second))
 			return false;
 	}
 	for (partial_assignment::iterator it = black_precondition.begin(); it != black_precondition.end(); it++) {
-		if (values[(*it).first] != (*it).second)
+		if (!std::binary_search(std::begin(values[it->first]), std::end(values[it->first]), it->second))
 			return false;
 	}
 	return true;
@@ -80,12 +80,17 @@ bool RedBlackOperator::is_applicable(const GlobalState& state) const {
 	return true;
 }
 
-void RedBlackOperator::apply(std::vector<int> &values) const {
+void RedBlackOperator::apply(std::vector<std::vector<int>> &values, const std::vector<bool> *outside_red_variables) const {
 	for (partial_assignment::iterator it=red_effect.begin(); it != red_effect.end(); it++) {
-    	values[it->first] = it->second;
+		if (!outside_red_variables || !outside_red_variables->at(it->first)) {
+			values[it->first] = {it->second};
+		} else {
+			values[it->first].push_back(it->second);
+			std::inplace_merge(std::begin(values[it->first]), std::end(values[it->first]) - 1, std::end(values[it->first]));
+		}
 	}
 	for (partial_assignment::iterator it=black_effect.begin(); it != black_effect.end(); it++) {
-		values[it->first] = it->second;
+		values[it->first] = {it->second};
 	}
 }
 
