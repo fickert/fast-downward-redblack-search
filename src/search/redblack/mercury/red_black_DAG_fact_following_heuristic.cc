@@ -1197,7 +1197,6 @@ void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const std::vecto
 
 int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const std::vector<FactPair> &goal_facts, int h_val) {
 	// In case it does happen, this means that all red values are achieved, and now we need to achieve the black goal values
-	std::cout << "checking if goal is reached" << std::endl;
 	if (is_semi_relaxed_goal_reached(goal_facts)) {
 		return h_val;
 	}
@@ -1206,7 +1205,6 @@ int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const std::vect
     cout << "Applying the following actions to achieve the black goals." << endl;
 #endif
 
-	std::cout << "resolving conflicts" << std::endl;
 	// Otherwise, collect the costs from the black dtgs (the missing part is already marked in the relevant dtgs)
 	int conflict_cost = resolve_conflicts();
 
