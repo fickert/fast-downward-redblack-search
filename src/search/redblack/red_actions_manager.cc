@@ -62,4 +62,14 @@ auto RedActionsManager::get_red_actions_for_state(const GlobalState &state) -> b
 	return result;
 }
 
+auto RedActionsManager::get_red_actions_for_state(const std::vector<boost::dynamic_bitset<>> &state) -> boost::dynamic_bitset<> {
+	auto result = red_operators;
+	for (const auto &conditionally_red_operator : conditionally_red_operators) {
+		assert(conditionally_red_operator.second.any());
+		if (std::all_of(std::begin(conditionally_red_operator.first), std::end(conditionally_red_operator.first), [&state](const auto &precondition) { return state[precondition.var][precondition.value]; }))
+			result |= conditionally_red_operator.second;
+	}
+	return result;
+}
+
 }
