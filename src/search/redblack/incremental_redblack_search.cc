@@ -263,7 +263,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 	auto current_red_actions = red_actions_manager->get_red_actions_for_state(current_redblack_state);
 	auto current_marked_facts_it = std::begin(marked_facts);
 
-	auto retry_with_more_mercury_red = [this, &repaired_plan, &current_partial_plan](auto rb_plan_it) {
+	auto retry_with_more_mercury_red = [this, &repaired_plan, &current_partial_plan, &plan, &marked_facts](auto rb_plan_it) {
 		auto to_be_painted_red = std::vector<int>();
 		for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
 			if (!plan_repair_heuristic->is_black(var))
@@ -282,7 +282,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		}
 		std::sort(std::begin(to_be_painted_red), std::end(to_be_painted_red));
 		to_be_painted_red.erase(std::unique(std::begin(to_be_painted_red), std::end(to_be_painted_red)), std::end(to_be_painted_red));
-		if (plan_repair_heuristic->get_num_black() == to_be_painted_red.size()) {
+		if (plan_repair_heuristic->get_num_black() == static_cast<int>(to_be_painted_red.size())) {
 			// would paint all remaining variables red ==> delete the plan repair heuristic
 			plan_repair_heuristic.reset();
 			repaired_plan.insert(std::end(repaired_plan), std::begin(current_partial_plan), std::end(current_partial_plan));
