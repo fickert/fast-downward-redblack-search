@@ -20,6 +20,7 @@ class RedBlackOperator {
 public:
 	RedBlackOperator(int _op_no);
 	virtual ~RedBlackOperator();
+	void reset();
 
 	void set_black_pre_eff(const std::vector<bool>& black_vars);
 	const partial_assignment& get_red_precondition() const { return red_precondition;}

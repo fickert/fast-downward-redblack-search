@@ -77,13 +77,16 @@ class RedBlackDAGFactFollowingHeuristic : public additive_heuristic::AdditiveHeu
 	}
 	void apply_op(const GlobalOperator *op, std::vector<std::vector<int>>& state) const {
 		for (size_t i = 0; i < op->get_effects().size(); i++) {
-			if (!current_outside_red_variables || !current_outside_red_variables->at(op->get_effects()[i].var)) {
+			if (!current_outside_red_variables || !current_outside_red_variables->at(op->get_effects()[i].var) || black_vars[op->get_effects()[i].var]) {
 				state[op->get_effects()[i].var] = {op->get_effects()[i].val};
 			} else {
-				state[op->get_effects()[i].var].push_back(op->get_effects()[i].val);
-				std::inplace_merge(std::begin(state[op->get_effects()[i].var]),
-				                   std::end(state[op->get_effects()[i].var]) - 1,
-				                   std::end(state[op->get_effects()[i].var]));
+				if (!std::binary_search(std::begin(state[op->get_effects()[i].var]),
+				                        std::end(state[op->get_effects()[i].var]), op->get_effects()[i].val)) {
+					state[op->get_effects()[i].var].push_back(op->get_effects()[i].val);
+					std::inplace_merge(std::begin(state[op->get_effects()[i].var]),
+					                   std::end(state[op->get_effects()[i].var]) - 1,
+					                   std::end(state[op->get_effects()[i].var]));
+				}
 			}
 		}
 	}
@@ -270,6 +273,12 @@ public:
 
 	auto compute_semi_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
 	auto compute_semi_relaxed_plan(const std::vector<FactPair> &available_facts, const std::vector<bool> &outside_red_variables, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
+
+	auto is_black(int var) const -> bool { return black_vars[var]; }
+	auto is_red(int var) const -> bool { return !black_vars[var]; }
+
+	void make_red(std::vector<int> variables);
+	void make_red(int var) { make_red({var}); }
 
     static void add_options_to_parser(options::OptionParser &parser);
 

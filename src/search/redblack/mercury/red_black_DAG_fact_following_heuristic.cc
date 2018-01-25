@@ -1123,9 +1123,11 @@ void RedBlackDAGFactFollowingHeuristic::reset_all_marks(const std::vector<FactPa
 	//	get_dtg(red_indices[ind])->postpone_sufficient_goal();
 	//}
 
-	for (const auto &goal_fact : goal_facts)
-		if (std::find(std::begin(black_indices), std::end(black_indices), goal_fact.var) == std::end(black_indices))
+	for (const auto &goal_fact : goal_facts) {
+		assert((std::find(std::begin(black_indices), std::end(black_indices), goal_fact.var) == std::end(black_indices)) == !black_vars[goal_fact.var]);
+		if (!black_vars[goal_fact.var])
 			get_dtg(goal_fact.var)->add_current_goal(goal_fact.value);
+	}
 }
 
 
@@ -1195,6 +1197,7 @@ void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const std::vecto
 
 int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const std::vector<FactPair> &goal_facts, int h_val) {
 	// In case it does happen, this means that all red values are achieved, and now we need to achieve the black goal values
+	std::cout << "checking if goal is reached" << std::endl;
 	if (is_semi_relaxed_goal_reached(goal_facts)) {
 		return h_val;
 	}
@@ -1203,6 +1206,7 @@ int RedBlackDAGFactFollowingHeuristic::add_red_black_plan_suffix(const std::vect
     cout << "Applying the following actions to achieve the black goals." << endl;
 #endif
 
+	std::cout << "resolving conflicts" << std::endl;
 	// Otherwise, collect the costs from the black dtgs (the missing part is already marked in the relevant dtgs)
 	int conflict_cost = resolve_conflicts();
 
@@ -1890,10 +1894,10 @@ bool RedBlackDAGFactFollowingHeuristic::is_semi_relaxed_goal_reached(const std::
 	for (int i = 0; i < goal.size(); i++) {
 		int var = goal[i].var;
 		int val = goal[i].value;
-		if (!is_semi_relaxed_achieved(var, val)) {
+		if (black_vars[var])
 			// Marking the pair for black variables
-			if (black_vars[var])
-				get_dtg(var)->mark_missing_val(val);
+			get_dtg(var)->mark_missing_val(val);
+		if (!is_semi_relaxed_achieved(var, val)) {
 
 			goal_reached = false;
 		}
@@ -2101,6 +2105,83 @@ int RedBlackDAGFactFollowingHeuristic::compute_heuristic(const GlobalState &stat
     }
 
     return res;
+}
+
+void RedBlackDAGFactFollowingHeuristic::make_red(std::vector<int> variables) {
+	for (auto black_var : variables) {
+		assert(black_vars[black_var]);
+		black_vars[black_var] = false;
+		black_indices.erase(std::find(std::begin(black_indices), std::end(black_indices), black_var));
+		red_indices.push_back(black_var);
+	}
+
+	// recompute use_black_dag
+	use_black_dag = false;
+	for (int i = 0; i < black_indices.size(); i++) {
+		int var = black_indices[i];
+		//		black_dag_edges[var].assign(g_variable_domain.size(), false);
+		const vector<int>& succ = get_cg_successors(var);
+
+		for (int j = 0; j < succ.size(); j++) {
+			int to_var = succ[j];
+			if (black_vars[to_var]) {
+				use_black_dag = true;
+				//				black_dag_edges[var][to_var] = true;
+			}
+		}
+	}
+
+	almost_roots.assign(g_variable_domain.size(), false);
+	bool connected_black = false;
+	for (int ind = 0; ind < black_indices.size(); ind++) {
+		int var = black_indices[ind];
+		const vector<int> &pred = get_cg_predecessors(var);
+
+		if (pred.size() > 0) {
+			almost_roots[var] = true;
+			for (int i = 0; i < pred.size(); i++) {
+				int pred_var = pred[i];
+				if (black_vars[pred_var] || connectivity_status[pred_var] != ALL_PAIRS_CONNECTED) {
+					almost_roots[var] = false;
+					break;
+				}
+			}
+		}
+		if (almost_roots[var])
+			connected_black = true;
+	}
+	if (!connected_black)
+		use_connected = false;
+
+	if (use_connected) {
+		// Setting the red variables
+		for (int ind = 0; ind < red_indices.size(); ind++) {
+			int var = red_indices[ind];
+			if (connectivity_status[var] == ALL_PAIRS_CONNECTED) {
+				get_dtg(var)->set_red_connected();
+				// Used only for finding actual plans
+				get_dtg(var)->set_only_current_transitions(true);
+			}
+		}
+	}
+
+	assert(!black_indices.empty());
+
+	// Removing unnecessary data after blacks are set
+	free_red_data();
+
+	// reset operators
+	for (auto op_index = 0u; op_index < g_operators.size(); ++op_index)
+		get_rb_sas_operator(op_index)->reset();
+
+	// Here we store the operators for counting achieved red preconditions
+	// We can skip the black variables here, since we check only for red preconditions
+	// Also counting the red preconditions for future applicability test of labels in dijkstra.
+	prepare_operators_for_counting_achieved_preconditions();
+	prepare_for_red_fact_following();
+
+	// Precalculating black paths/values (in case it was not done before)
+	precalculate_variables();
 }
 
 void RedBlackDAGFactFollowingHeuristic::add_options_to_parser(OptionParser &parser) {
