@@ -5,6 +5,7 @@
 #include "../options/bounds.h"
 #include "../options/option_parser.h"
 #include "../globals.h"
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 
 auto get_adjusted_action_cost(const redblack::RBOperator &op, OperatorCost cost_type) -> int {
 	return get_adjusted_action_cost(op.get_base_operator(), cost_type);
@@ -87,7 +88,38 @@ void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<Opera
 void debug_verify_relaxed_plan(const GlobalState &, const std::vector<OperatorID> &, const std::vector<FactPair> &) {}
 #endif
 
-auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts) -> std::vector<OperatorID> {
+auto get_ordered_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID> {
+	auto ordered_relaxed_plan = std::vector<OperatorID>();
+	ordered_relaxed_plan.reserve(relaxed_plan.size());
+	auto current_achieved_values = std::vector<boost::dynamic_bitset<>>();
+	current_achieved_values.reserve(g_root_task()->get_num_variables());
+	for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
+		current_achieved_values.emplace_back(boost::dynamic_bitset<>(g_root_task()->get_variable_domain_size(var)));
+		current_achieved_values.back()[state[var]] = true;
+	}
+	auto open = relaxed_plan;
+	auto next_open = std::vector<OperatorID>();
+	while (!open.empty()) {
+		for (const auto op_id : open) {
+			const auto &op = g_operators[op_id.get_index()];
+			if (std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&current_achieved_values](const auto &precondition) {
+				return current_achieved_values[precondition.var][precondition.val];
+			})) {
+				ordered_relaxed_plan.push_back(op_id);
+				for (const auto &effect : op.get_effects())
+					current_achieved_values[effect.var].set(effect.val);
+			} else {
+				next_open.push_back(op_id);
+			}
+		}
+		assert(next_open.size() < open.size());
+		open = next_open;
+		next_open.clear();
+	}
+	return ordered_relaxed_plan;
+}
+
+auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts, bool ordered) -> std::vector<OperatorID> {
 	auto open = std::unordered_set<FactPair>();
 	for (const auto &goal_fact : goal_facts)
 		if (state[goal_fact.var] != goal_fact.value)
@@ -113,7 +145,6 @@ auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, c
 		open = std::move(next_open);
 	}
 	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
-	//debug_verify_relaxed_plan(state, relaxed_plan, goal_facts);
-	return relaxed_plan;
+	return ordered ? get_ordered_relaxed_plan(state, relaxed_plan) : relaxed_plan;
 }
 }
