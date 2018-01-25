@@ -134,7 +134,14 @@ void DtgOperators::add_current_goal(int goal) {
 	assert(use_sufficient_unachieved);
 	assert(goal_val == -1);
 
-	mark_as_sufficient(goal);
+	if (!is_sufficient_unachieved(goal)) {
+		mark_as_sufficient(goal);
+	} else {
+		// Removing from the beginning
+		red_sufficient_unachieved.erase(red_sufficient_unachieved_iterators[goal]);
+		// Adding to the end
+		red_sufficient_unachieved_iterators[goal] = red_sufficient_unachieved.insert(red_sufficient_unachieved.end(), goal);
+	}
 }
 
 
