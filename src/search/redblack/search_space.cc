@@ -37,10 +37,11 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
     std::reverse(path.begin(), path.end());
     std::reverse(best_supporters.begin(), best_supporters.end());
 
-    std::set<std::pair<int, int> > marked_facts;
+    std::set<FactPair> marked_facts;
+	auto achieved_facts = std::make_unique<std::vector<std::set<FactPair>>>();
     for (auto const &goal : g_goal){
         if (goal_state.get_painting().is_red_var(goal.first)){
-            marked_facts.insert(goal);
+            marked_facts.emplace(goal.first, goal.second);
 #ifdef DEBUG_PLAN_EXTRACTION
             cout << "marked goal fact " << g_fact_names[goal.first][goal.second] << endl;
 #endif
@@ -53,8 +54,9 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
         cout << "step " << step << endl;
 #endif
         std::vector<OperatorID> ops_current_step;
-        std::set<std::pair<int, int> > remaining_marked;
-		std::set<std::pair<int, int> > new_marked;
+        std::set<FactPair> remaining_marked;
+		std::set<FactPair> new_marked;
+		std::set<FactPair> achieved;
             
         bool change = true;
         while (change){
@@ -65,13 +67,15 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
 #ifdef DEBUG_PLAN_EXTRACTION
                 cout << "handling fact " << g_fact_names[fact.first][fact.second];
 #endif
-                auto op_id = best_supporters[step][fact.first][fact.second];
+                auto op_id = best_supporters[step][fact.var][fact.value];
                 if (op_id.get_index() == -1){
 #ifdef DEBUG_PLAN_EXTRACTION                        
                     cout << " => cannot be achieved in this step" << endl;
 #endif
                     remaining_marked.insert(fact);
                     continue;
+                } else {
+	                achieved.insert(fact);
                 }
 				const auto &op = operators[op_id.get_index()];
 #ifdef DEBUG_PLAN_EXTRACTION
@@ -83,7 +87,7 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
                     ops_current_step.push_back(op_id);
                     for (auto const &pre : op.get_red_preconditions()) {
 						// TODO: ??
-                        change |= new_marked.insert(std::make_pair(pre->var, pre->val)).second;
+                        change |= new_marked.emplace(pre->var, pre->val).second;
 #ifdef DEBUG_PLAN_EXTRACTION
                         cout << "marked precondition fact " << g_fact_names[pre->var][pre->val] << endl;
 #endif
@@ -135,6 +139,7 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
         }
             
         plan.insert(plan.end(), sorted_ops.rbegin(), sorted_ops.rend());
+		achieved_facts->emplace_back(std::move(achieved));
         if (step != 0){
             const redblack::RBOperator *black_op = path[step - 1];
 #ifdef DEBUG_PLAN_EXTRACTION
@@ -142,10 +147,10 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
 #endif
             plan.push_back(black_op);
             for (auto const &pre : black_op->get_red_preconditions()){
-                marked_facts.insert(std::make_pair(pre->var, pre->val));
+                marked_facts.emplace(pre->var, pre->val);
             }
             for (auto const &eff : black_op->get_red_effects()){
-                marked_facts.erase(std::make_pair(eff->var, eff->val));
+                marked_facts.erase(FactPair(eff->var, eff->val));
             }
         }
     }
@@ -153,6 +158,8 @@ void SearchSpace<redblack::RBState, redblack::RBOperator>::trace_path(const redb
     path = plan;
         
     reverse(path.begin(), path.end());
+	reverse(std::begin(*achieved_facts), std::end(*achieved_facts));
+	rb_state_registry.set_last_marked_facts(std::move(achieved_facts));
         
 #ifdef DEBUG_PLAN_EXTRACTION
     cout << endl;

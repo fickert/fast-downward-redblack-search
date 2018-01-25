@@ -6,6 +6,8 @@
 
 #include "int_packer.h"
 
+template<class StateType, class OperatorType, class StateRegistryType>
+class SearchSpace;
 
 namespace redblack {
 class RBState;
@@ -16,6 +18,14 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 	const Painting *painting;
 	const std::vector<RBOperator> operators;
 	std::vector<std::vector<OperatorID>> initial_state_best_supporters;
+
+	std::unique_ptr<std::vector<std::set<FactPair>>> last_traced_path_marked_facts;
+
+	friend class SearchSpace<RBState, RBOperator, StateRegistryBase<RBState, RBOperator>>;
+
+	void set_last_marked_facts(std::unique_ptr<std::vector<std::set<FactPair>>> last_traced_path_marked_facts) {
+		this->last_traced_path_marked_facts = std::move(last_traced_path_marked_facts);
+	}
 
 	auto rb_state_packer() const -> const RBIntPacker & {
 		return static_cast<const RBIntPacker &>(state_packer);
@@ -42,6 +52,10 @@ public:
 
 	auto get_initial_state_best_supporters() const -> const std::vector<std::vector<OperatorID>> & {
 		return initial_state_best_supporters;
+	}
+
+	auto get_last_marked_facts() -> std::unique_ptr<std::vector<std::set<FactPair>>> {
+		return std::move(last_traced_path_marked_facts);
 	}
 
 	auto lookup_state(StateID id) const -> RBState override;

@@ -73,6 +73,8 @@ public:
     void set_bound(int b) {bound = b; }
     int get_bound() {return bound; }
 
+	auto get_state_registry() -> StateRegistryBase<StateType, OperatorType> & { return *state_registry; }
+
     /* The following three methods should become functions as they
        do not require access to private/protected class members. */
     static void add_pruning_option(options::OptionParser &parser);
