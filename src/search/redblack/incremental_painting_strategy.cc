@@ -112,6 +112,7 @@ auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last
 			}
 			continue;
 		}
+		assert(i != -1);
 		assert(painting[i]);
 		painting[i] = false;
 		assert(!(never_black_variables && never_black_variables->at(i)));

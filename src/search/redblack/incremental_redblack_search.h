@@ -37,14 +37,17 @@ protected:
 
 	void initialize_rb_search_engine();
 	void update_statistics();
-	auto get_successor_and_update_search_space(const GlobalState& current_state, const GlobalOperator& op) -> GlobalState;
-	auto check_plan_and_update_search_space(const GlobalState& state, const std::vector<OperatorID>& plan, const std::vector<FactPair>& goal_facts) -> std::pair<bool, GlobalState>;
+	auto get_successor_and_update_search_space(const GlobalState &current_state, const GlobalOperator &op) -> GlobalState;
+	auto check_plan_and_update_search_space(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState>;
 	auto check_plan_and_update_search_space(const RBPlan &plan) -> std::pair<bool, GlobalState>;
-	auto repair_plan_and_update_search_space(const GlobalState& state,
-	                                                         const std::vector<FactPair>& goal_facts,
-	                                                         const std::vector<OperatorID>& partial_plan,
-	                                                         const boost::dynamic_bitset<>& red_actions) -> std::pair<bool, GlobalState>;
-	auto repair_plan_and_update_search_space(const RBPlan &plan) -> std::pair<bool, GlobalState>;
+	static auto is_valid_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &relaxed_plan) -> bool;
+	auto repair_plan_and_update_search_space(const GlobalState &state,
+	                                         const std::vector<FactPair> &goal_facts,
+	                                         const std::vector<OperatorID> &partial_plan,
+	                                         const boost::dynamic_bitset<> &red_actions) -> std::pair<bool, GlobalState>;
+	auto repair_plan_and_update_search_space(const RBPlan &plan, const std::vector<std::set<FactPair>> &
+	                                         marked_facts) -> std::pair<bool, GlobalState>;
+	auto relaxed_repair_plan(const RBPlan &plan, const std::vector<std::set<FactPair>> &marked_facts) -> std::vector<OperatorID>;
 
 	GlobalState current_initial_state;
 
@@ -71,6 +74,7 @@ protected:
 	const bool continue_from_first_conflict;
 	std::shared_ptr<RedBlackDAGFactFollowingHeuristic> plan_repair_heuristic;
 	std::unique_ptr<RedActionsManager> red_actions_manager;
+	const bool always_recompute_red_plans;
 
 	std::vector<bool> never_black_variables;
 
