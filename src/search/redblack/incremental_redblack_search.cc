@@ -257,10 +257,39 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 					available_facts.emplace_back(var, value);
 		return available_facts;
 	};
+
 	auto current_partial_plan = std::vector<OperatorID>();
 	auto repaired_plan = std::vector<OperatorID>();
 	auto current_red_actions = red_actions_manager->get_red_actions_for_state(current_redblack_state);
 	auto current_marked_facts_it = std::begin(marked_facts);
+
+	auto retry_with_more_mercury_red = [this, &repaired_plan, &current_partial_plan](auto rb_plan_it) {
+		if (plan_repair_heuristic->get_num_black() == 1) {
+			plan_repair_heuristic.reset();
+			repaired_plan.insert(std::end(repaired_plan), std::begin(current_partial_plan), std::end(current_partial_plan));
+			std::transform(rb_plan_it, std::end(plan), std::back_inserter(repaired_plan), [](const auto rb_op) { return rb_op->get_id(); });
+			return repaired_plan;
+		}
+		auto to_be_painted_red = std::vector<int>();
+		for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
+			if (!plan_repair_heuristic->is_black(var))
+				continue;
+			auto predecessors = causal_graph::get_causal_graph(g_root_task().get()).get_predecessors(var);
+			assert(std::is_sorted(std::begin(predecessors), std::end(predecessors)));
+			auto successors = causal_graph::get_causal_graph(g_root_task().get()).get_successors(var);
+			assert(std::is_sorted(std::begin(successors), std::end(successors)));
+			auto both = std::vector<int>();
+			std::set_intersection(std::begin(predecessors), std::end(predecessors),
+				std::begin(successors), std::end(successors), std::back_inserter(both));
+			if (std::any_of(std::begin(both), std::end(both), [this](const auto var) { return rb_data->painting.is_black_var(var); })) {
+				never_black_variables[var] = false;
+				to_be_painted_red.push_back(var);
+			}
+		}
+		plan_repair_heuristic->make_red(to_be_painted_red);
+		return relaxed_repair_plan(plan, marked_facts);
+	};
+
 	for (auto rb_plan_it = std::begin(plan); rb_plan_it != std::end(plan); ++rb_plan_it) {
 		const auto rb_op = *rb_plan_it;
 		assert(current_marked_facts_it != std::end(marked_facts));
@@ -291,33 +320,9 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		}
 		// NOTE: current_goal_facts no longer sorted
 		auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(get_available_facts(), rb_data->painting.get_painting(), current_goal_facts, current_partial_plan, current_red_actions);
-		while (!repaired) {
+		if (!repaired)
 			// relaxed plan repair failed. paint mercury-black variables red and try again
-			if (plan_repair_heuristic->get_num_black() == 1) {
-				plan_repair_heuristic.reset();
-				repaired_plan.insert(std::end(repaired_plan), std::begin(current_partial_plan), std::end(current_partial_plan));
-				std::transform(rb_plan_it, std::end(plan), std::back_inserter(repaired_plan), [](const auto rb_op) { return rb_op->get_id(); });
-				return repaired_plan;
-			}
-			auto to_be_painted_red = std::vector<int>();
-			for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
-				if (!plan_repair_heuristic->is_black(var))
-					continue;
-				auto predecessors = causal_graph::get_causal_graph(g_root_task().get()).get_predecessors(var);
-				assert(std::is_sorted(std::begin(predecessors), std::end(predecessors)));
-				auto successors = causal_graph::get_causal_graph(g_root_task().get()).get_successors(var);
-				assert(std::is_sorted(std::begin(successors), std::end(successors)));
-				auto both = std::vector<int>();
-				std::set_intersection(std::begin(predecessors), std::end(predecessors),
-					                    std::begin(successors), std::end(successors), std::back_inserter(both));
-				if (std::any_of(std::begin(both), std::end(both), [this](const auto var) { return rb_data->painting.is_black_var(var); })) {
-					never_black_variables[var] = false;
-					to_be_painted_red.push_back(var);
-				}
-			}
-			plan_repair_heuristic->make_red(to_be_painted_red);
-			return relaxed_repair_plan(plan, marked_facts);
-		}
+			return retry_with_more_mercury_red(rb_plan_it);
 		repaired_partial_plan.emplace_back(rb_op->get_id());
 		for (const auto &op_id : repaired_partial_plan) {
 			assert(std::all_of(std::begin(g_operators[op_id.get_index()].get_preconditions()), std::end(g_operators[op_id.get_index()].get_preconditions()),
@@ -340,10 +345,8 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 	goal_facts.reserve(g_goal.size());
 	std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
 	auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(get_available_facts(), rb_data->painting.get_painting(), goal_facts, current_partial_plan, current_red_actions);
-	if (!repaired) {
-		std::cerr << "Failed to repair relaxed plan with red-black semantics" << std::endl;
-		utils::exit_with(utils::ExitCode::CRITICAL_ERROR);
-	}
+	if (!repaired)
+		return retry_with_more_mercury_red(std::end(plan));
 	repaired_plan.insert(std::end(repaired_plan), std::begin(repaired_partial_plan), std::end(repaired_partial_plan));
 	return repaired_plan;
 }
