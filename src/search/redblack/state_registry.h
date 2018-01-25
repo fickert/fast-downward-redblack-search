@@ -77,21 +77,6 @@ public:
 	auto get_operators() const -> const std::vector<RBOperator> & { return operators; }
 };
 
-template<class ValuesType>
-auto RBStateRegistry::get_state(const ValuesType &values, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>> {
-	auto buffer = new PackedStateBin[get_bins_per_state()];
-	populate_buffer(buffer, values);
-	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
-	auto best_supporters = state_saturation->saturate_state(buffer, get_best_supporters);
-	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
-	axiom_evaluator.evaluate(buffer, state_packer);
-	state_data_pool.push_back(buffer);
-	// buffer is copied by push_back
-	delete[] buffer;
-	StateID id = insert_id_or_pop_state();
-	return {lookup_state(id), best_supporters};
-}
-
 }
 
 template<>
