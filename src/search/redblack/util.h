@@ -3,6 +3,7 @@
 
 #include "../operator_cost.h"
 #include <vector>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 
 struct FactPair;
 class OperatorID;
@@ -32,6 +33,8 @@ auto get_no_red_conditional_effect_conditions_painting(const Painting &painting)
 void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan, const std::vector<FactPair> &goal_facts);
 auto get_ordered_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID>;
 auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts, bool ordered) -> std::vector<OperatorID>;
+auto get_ordered_relaxed_plan(const std::vector<boost::dynamic_bitset<>> &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID>;
+auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const std::vector<boost::dynamic_bitset<>> &state, const std::vector<FactPair> &goal_facts, bool ordered) -> std::vector<OperatorID>;
 }
 
 

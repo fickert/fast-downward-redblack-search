@@ -40,6 +40,7 @@ protected:
 	auto get_successor_and_update_search_space(const GlobalState &current_state, const GlobalOperator &op) -> GlobalState;
 	auto check_plan_and_update_search_space(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState>;
 	auto check_plan_and_update_search_space(const RBPlan &plan) -> std::pair<bool, GlobalState>;
+	static auto is_valid_relaxed_plan(const std::vector<boost::dynamic_bitset<>> &achieved_facts, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &relaxed_plan) -> bool;
 	static auto is_valid_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &relaxed_plan) -> bool;
 	auto repair_plan_and_update_search_space(const GlobalState &state,
 	                                         const std::vector<FactPair> &goal_facts,

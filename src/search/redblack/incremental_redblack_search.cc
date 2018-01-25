@@ -106,29 +106,37 @@ auto IncrementalRedBlackSearch::check_plan_and_update_search_space(const RBPlan 
 	return {test_goal(current_state), current_state};
 }
 
-auto IncrementalRedBlackSearch::is_valid_relaxed_plan(const GlobalState& state, const std::vector<FactPair>& goal_facts, const std::vector<OperatorID>& relaxed_plan) -> bool {
+auto IncrementalRedBlackSearch::is_valid_relaxed_plan(
+	const std::vector<boost::dynamic_bitset<>> &achieved_facts,
+	const std::vector<FactPair> &goal_facts,
+	const std::vector<OperatorID> &relaxed_plan) -> bool {
+	// NOTE: this assumes that the relaxed plan is applicable in the given order which may not be guaranteed
+	auto current_achieved_facts = achieved_facts;
+	for (const auto &op_id : relaxed_plan) {
+		const auto &op = g_operators[op_id.get_index()];
+		if (!std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&current_achieved_facts](const auto &precondition) {
+			return current_achieved_facts[precondition.var][precondition.val];
+		}))
+			return false;
+		for (const auto &effect : op.get_effects())
+			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), [&current_achieved_facts](const auto &condition) {
+				return current_achieved_facts[condition.var][condition.val];
+			}))
+				current_achieved_facts[effect.var].set(effect.val);
+	}
+	return std::all_of(std::begin(goal_facts), std::end(goal_facts), [&current_achieved_facts](const auto &goal_fact) {
+		return current_achieved_facts[goal_fact.var][goal_fact.value];
+	});
+}
+
+auto IncrementalRedBlackSearch::is_valid_relaxed_plan(const GlobalState& state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &relaxed_plan) -> bool {
 	auto achieved_facts = std::vector<boost::dynamic_bitset<>>();
 	achieved_facts.resize(g_root_task()->get_num_variables());
 	for (auto i = 0u; i < achieved_facts.size(); ++i) {
 		achieved_facts[i].resize(g_root_task()->get_variable_domain_size(i));
 		achieved_facts[i].set(state[i]);
 	}
-	// NOTE: this assumes that the relaxed plan is applicable in the given order which may not be guaranteed
-	for (const auto &op_id : relaxed_plan) {
-		const auto &op = g_operators[op_id.get_index()];
-		if (!std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&achieved_facts](const auto &precondition) {
-			return achieved_facts[precondition.var][precondition.val];
-		}))
-			return false;
-		for (const auto &effect : op.get_effects())
-			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), [&achieved_facts](const auto &condition) {
-				return achieved_facts[condition.var][condition.val];
-			}))
-				achieved_facts[effect.var].set(effect.val);
-	}
-	return std::all_of(std::begin(goal_facts), std::end(goal_facts), [&achieved_facts](const auto &goal_fact) {
-		return achieved_facts[goal_fact.var][goal_fact.value];
-	});
+	return is_valid_relaxed_plan(achieved_facts, goal_facts, relaxed_plan);
 }
 
 auto IncrementalRedBlackSearch::repair_plan_and_update_search_space(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &partial_plan, const boost::dynamic_bitset<> &red_actions) -> std::pair<bool, GlobalState> {
@@ -262,6 +270,8 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 	auto repaired_plan = std::vector<OperatorID>();
 	auto current_red_actions = red_actions_manager->get_red_actions_for_state(current_redblack_state);
 	auto current_marked_facts_it = std::begin(marked_facts);
+	auto deferred_goal_facts = std::vector<FactPair>();
+	auto [current_saturated_state, current_supporters] = static_cast<RBStateRegistry *>(&rb_search_engine->get_state_registry())->get_state_and_best_supporters(current_redblack_state);
 
 	auto retry_with_more_mercury_red = [this, &repaired_plan, &current_partial_plan, &plan, &marked_facts](auto rb_plan_it) {
 		auto to_be_painted_red = std::vector<int>();
@@ -282,6 +292,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		}
 		std::sort(std::begin(to_be_painted_red), std::end(to_be_painted_red));
 		to_be_painted_red.erase(std::unique(std::begin(to_be_painted_red), std::end(to_be_painted_red)), std::end(to_be_painted_red));
+		std::cout << "painting " << to_be_painted_red.size() << " variables red (previously " << plan_repair_heuristic->get_num_black() << " black" << std::endl;
 		if (plan_repair_heuristic->get_num_black() == static_cast<int>(to_be_painted_red.size())) {
 			// would paint all remaining variables red ==> delete the plan repair heuristic
 			plan_repair_heuristic.reset();
@@ -312,8 +323,26 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 				!= std::end(plan_repair_heuristic->get_black_indices());
 		}), std::end(current_goal_facts));
 		assert(std::is_sorted(std::begin(current_goal_facts), std::end(current_goal_facts)));
+		// insert previously deferred goal facts
+		assert(std::none_of(std::begin(deferred_goal_facts), std::end(deferred_goal_facts), [&current_goal_facts](const auto &deferred_goal_fact) {
+			return std::binary_search(std::begin(current_goal_facts), std::end(current_goal_facts), deferred_goal_fact);
+		}));
+		const auto before_deferred_size = current_goal_facts.size();
+		current_goal_facts.insert(std::end(current_goal_facts), std::begin(deferred_goal_facts), std::end(deferred_goal_facts));
+		std::sort(std::begin(current_goal_facts) + before_deferred_size, std::end(current_goal_facts));
+		std::inplace_merge(std::begin(current_goal_facts), std::begin(current_goal_facts) + before_deferred_size, std::end(current_goal_facts));
+		// defer all the marked facts that cannot be reached from this state to a later step
+		const auto begin_deferred = std::remove_if(std::begin(current_goal_facts), std::end(current_goal_facts), [&current_saturated_state](const auto &fact) {
+			return !current_saturated_state.has_fact(fact.var, fact.value);
+		});
+		deferred_goal_facts.clear();
+		deferred_goal_facts.insert(std::begin(deferred_goal_facts), begin_deferred, std::end(current_goal_facts));
+		current_goal_facts.erase(begin_deferred, std::end(current_goal_facts));
+		// check if all the preconditions of the next black variable can actually be reached
 		const auto size = current_goal_facts.size();
 		for (const auto &precondition : rb_op->get_red_preconditions()) {
+			if (!current_saturated_state.has_fact(precondition->var, precondition->val))
+				return retry_with_more_mercury_red(rb_plan_it);
 			// NOTE: in theory, we only need to insert the mercury-black preconditions, because the red preconditions should already be achieved by the red plan,
 			// (or in any previous red plan), and with red-black semantics they can't have been deleted again
 			// however, we don't need to take them out of the set of goal facts (they will be ignored anyway by the plan repair)
@@ -322,6 +351,9 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 				current_goal_facts.emplace_back(precondition_fact);
 		}
 		// NOTE: current_goal_facts no longer sorted
+		if (always_recompute_red_plans || !is_valid_relaxed_plan(current_redblack_state, current_goal_facts, current_partial_plan))
+			current_partial_plan = get_red_plan(current_supporters, current_redblack_state, current_goal_facts, true);
+		assert(is_valid_relaxed_plan(current_redblack_state, current_goal_facts, current_partial_plan));
 		auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(get_available_facts(), rb_data->painting.get_painting(), current_goal_facts, current_partial_plan, current_red_actions);
 		if (!repaired)
 			// relaxed plan repair failed. paint mercury-black variables red and try again
@@ -342,11 +374,20 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		current_partial_plan.clear();
 		current_red_actions = red_actions_manager->get_red_actions_for_state(current_redblack_state);
 		++current_marked_facts_it;
+		std::tie(current_saturated_state, current_supporters) = static_cast<RBStateRegistry *>(&rb_search_engine->get_state_registry())->get_state_and_best_supporters(current_redblack_state);
 	}
 	assert(current_marked_facts_it + 1 == std::end(marked_facts));
 	auto goal_facts = std::vector<FactPair>();
 	goal_facts.reserve(g_goal.size());
 	std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
+	if (!std::all_of(std::begin(goal_facts), std::end(goal_facts), [&current_saturated_state](const auto &goal_fact) {
+		return current_saturated_state.has_fact(goal_fact.var, goal_fact.value);
+	}))
+		// the goal is not reachable from this state
+		return retry_with_more_mercury_red(std::end(plan));
+	if (always_recompute_red_plans || !is_valid_relaxed_plan(current_redblack_state, goal_facts, current_partial_plan))
+		current_partial_plan = get_red_plan(current_supporters, current_redblack_state, goal_facts, true);
+	assert(is_valid_relaxed_plan(current_redblack_state, goal_facts, current_partial_plan));
 	auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(get_available_facts(), rb_data->painting.get_painting(), goal_facts, current_partial_plan, current_red_actions);
 	if (!repaired)
 		return retry_with_more_mercury_red(std::end(plan));

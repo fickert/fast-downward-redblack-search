@@ -143,9 +143,7 @@ auto RBStateRegistry::get_successor_state_and_best_supporters(const RBState &pre
 	return get_successor_state(predecessor, op, true);
 }
 
-auto RBStateRegistry::get_state(const std::vector<int> &values, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>> {
-	auto buffer = new PackedStateBin[get_bins_per_state()];
-	// Avoid garbage values in half-full bins.
+void RBStateRegistry::populate_buffer(PackedStateBin *buffer, const std::vector<int> &values) const {
 	std::fill_n(buffer, get_bins_per_state(), 0);
 	for (size_t i = 0; i < values.size(); ++i) {
 		if (painting->is_red_var(i)) {
@@ -155,22 +153,36 @@ auto RBStateRegistry::get_state(const std::vector<int> &values, bool get_best_su
 			rb_state_packer().set(buffer, i, values[i]);
 		}
 	}
-	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
-	auto best_supporters = state_saturation->saturate_state(buffer, get_best_supporters);
-	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
-	axiom_evaluator.evaluate(buffer, state_packer);
-	state_data_pool.push_back(buffer);
-	// buffer is copied by push_back
-	delete[] buffer;
-	StateID id = insert_id_or_pop_state();
-	return {lookup_state(id), best_supporters};
+}
+
+void RBStateRegistry::populate_buffer(PackedStateBin *buffer, const std::vector<boost::dynamic_bitset<>> &values) const {
+	std::fill_n(buffer, get_bins_per_state(), 0);
+	for (size_t i = 0; i < values.size(); ++i) {
+		assert(values[i].any());
+		if (painting->is_red_var(i)) {
+			rb_state_packer().init_zero(buffer, i);
+			for (auto pos = values[i].find_first(); pos != values[i].npos; pos = values[i].find_next(pos))
+				rb_state_packer().set_bit(buffer, i, pos);
+		} else {
+			assert(values[i].count() == 1);
+			rb_state_packer().set(buffer, i, values[i].find_first());
+		}
+	}
 }
 
 auto RBStateRegistry::get_state(const std::vector<int> &values) -> RBState {
 	return get_state(values, false).first;
 }
 
+auto RBStateRegistry::get_state(const std::vector<boost::dynamic_bitset<>> &values) -> RBState {
+	return get_state(values, false).first;
+}
+
 auto RBStateRegistry::get_state_and_best_supporters(const std::vector<int> &values) -> std::pair<RBState, std::vector<std::vector<OperatorID>>> {
+	return get_state(values, true);
+}
+
+auto RBStateRegistry::get_state_and_best_supporters(const std::vector<boost::dynamic_bitset<>> &values) -> std::pair<RBState, std::vector<std::vector<OperatorID>>> {
 	return get_state(values, true);
 }
 

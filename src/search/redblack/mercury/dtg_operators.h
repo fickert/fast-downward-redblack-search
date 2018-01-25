@@ -117,7 +117,7 @@ public:
 	bool check_invertibility() const;
 
 	void set_follow_red_facts() { use_sufficient_unachieved = true; }
-	void set_use_black_reachable() { use_black_reachable = true; }
+	void set_use_black_reachable(bool do_use_black_reachable = true) { use_black_reachable = do_use_black_reachable; }
 
 	// For delaying the goal achievement
 	ConnectivityStatus check_connectivity();

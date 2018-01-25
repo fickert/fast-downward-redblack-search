@@ -5,6 +5,7 @@
 #include "../task_utils/successor_generator.h"
 
 #include "int_packer.h"
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 
 template<class StateType, class OperatorType, class StateRegistryType>
 class SearchSpace;
@@ -38,7 +39,10 @@ class RBStateRegistry : public StateRegistryBase<RBState, RBOperator> {
 	static auto get_state_saturation(const AbstractTask &task, const RBIntPacker &state_packer, const std::vector<RBOperator> &operators) -> std::unique_ptr<StateSaturation>;
 	static auto construct_redblack_operators(const Painting &painting) -> std::vector<RBOperator>;
 
-	auto get_state(const std::vector<int> &values, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
+	void populate_buffer(PackedStateBin *buffer, const std::vector<int> &values) const;
+	void populate_buffer(PackedStateBin *buffer, const std::vector<boost::dynamic_bitset<>> &values) const;
+	template<class ValuesType>
+	auto get_state(const ValuesType &values, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 	auto get_successor_state(const RBState &predecessor, const RBOperator &op, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 
 public:
@@ -64,15 +68,31 @@ public:
 	auto get_successor_state_and_best_supporters(const RBState &predecessor, const RBOperator &op) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 	auto get_best_supporters_for_successor(const RBState &predecessor, const RBOperator &op) const -> std::vector<std::vector<OperatorID>>;
 	auto get_state(const std::vector<int> &values) -> RBState;
+	auto get_state(const std::vector<boost::dynamic_bitset<>> &values) -> RBState;
 	auto get_state_and_best_supporters(const std::vector<int> &values) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
+	auto get_state_and_best_supporters(const std::vector<boost::dynamic_bitset<>> &values) -> std::pair<RBState, std::vector<std::vector<OperatorID>>>;
 
 	auto get_painting() const -> const Painting & { return *painting; }
 
 	auto get_operators() const -> const std::vector<RBOperator> & { return operators; }
 };
 
+template<class ValuesType>
+auto RBStateRegistry::get_state(const ValuesType &values, bool get_best_supporters) -> std::pair<RBState, std::vector<std::vector<OperatorID>>> {
+	auto buffer = new PackedStateBin[get_bins_per_state()];
+	populate_buffer(buffer, values);
+	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
+	auto best_supporters = state_saturation->saturate_state(buffer, get_best_supporters);
+	assert(state_buffer_sanity_check(buffer, rb_state_packer()));
+	axiom_evaluator.evaluate(buffer, state_packer);
+	state_data_pool.push_back(buffer);
+	// buffer is copied by push_back
+	delete[] buffer;
+	StateID id = insert_id_or_pop_state();
+	return {lookup_state(id), best_supporters};
 }
 
+}
 
 template<>
 auto StateRegistryBase<redblack::RBState, redblack::RBOperator>::lookup_state(StateID) const -> redblack::RBState;

@@ -2109,6 +2109,7 @@ void RedBlackDAGFactFollowingHeuristic::make_red(std::vector<int> variables) {
 	for (auto black_var : variables) {
 		assert(black_vars[black_var]);
 		black_vars[black_var] = false;
+		get_dtg(black_var)->set_use_black_reachable(false);
 		black_indices.erase(std::find(std::begin(black_indices), std::end(black_indices), black_var));
 		red_indices.push_back(black_var);
 	}

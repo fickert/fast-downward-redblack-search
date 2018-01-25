@@ -5,7 +5,6 @@
 #include "../options/bounds.h"
 #include "../options/option_parser.h"
 #include "../globals.h"
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
 
 auto get_adjusted_action_cost(const redblack::RBOperator &op, OperatorCost cost_type) -> int {
 	return get_adjusted_action_cost(op.get_base_operator(), cost_type);
@@ -147,4 +146,60 @@ auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, c
 	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
 	return ordered ? get_ordered_relaxed_plan(state, relaxed_plan) : relaxed_plan;
 }
+
+auto get_ordered_relaxed_plan(const std::vector<boost::dynamic_bitset<>> &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID> {
+	auto ordered_relaxed_plan = std::vector<OperatorID>();
+	ordered_relaxed_plan.reserve(relaxed_plan.size());
+	auto current_achieved_values = state;
+	auto open = relaxed_plan;
+	auto next_open = std::vector<OperatorID>();
+	while (!open.empty()) {
+		for (const auto op_id : open) {
+			const auto &op = g_operators[op_id.get_index()];
+			if (std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&current_achieved_values](const auto &precondition) {
+				return current_achieved_values[precondition.var][precondition.val];
+			})) {
+				ordered_relaxed_plan.push_back(op_id);
+				for (const auto &effect : op.get_effects())
+					current_achieved_values[effect.var].set(effect.val);
+			} else {
+				next_open.push_back(op_id);
+			}
+		}
+		assert(next_open.size() < open.size());
+		open = next_open;
+		next_open.clear();
+	}
+	return ordered_relaxed_plan;
+}
+
+auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const std::vector<boost::dynamic_bitset<>> &state, const std::vector<FactPair> &goal_facts, bool ordered) -> std::vector<OperatorID> {
+	auto open = std::unordered_set<FactPair>();
+	for (const auto &goal_fact : goal_facts)
+		if (!state[goal_fact.var][goal_fact.value])
+			open.insert(goal_fact);
+	auto closed = std::unordered_set<FactPair>();
+	auto relaxed_plan = std::vector<OperatorID>();
+	while (!open.empty()) {
+		auto next_open = std::unordered_set<FactPair>();
+		auto this_phase_closed = std::unordered_set<FactPair>();
+		for (const auto &open_fact : open) {
+			if (closed.find(open_fact) != std::end(closed) || this_phase_closed.find(open_fact) != std::end(this_phase_closed))
+				continue;
+			auto supporter_id = best_supporters[open_fact.var][open_fact.value];
+			assert(supporter_id.get_index() != -1);
+			if (std::find(std::begin(relaxed_plan), std::end(relaxed_plan), supporter_id) == std::end(relaxed_plan)) {
+				relaxed_plan.push_back(supporter_id);
+				const auto &supporter = g_operators[supporter_id.get_index()];
+				for (const auto &precondition : supporter.get_preconditions())
+					if (!state[precondition.var][precondition.val])
+						next_open.emplace(precondition.var, precondition.val);
+			}
+		}
+		open = std::move(next_open);
+	}
+	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
+	return ordered ? get_ordered_relaxed_plan(state, relaxed_plan) : relaxed_plan;
+}
+
 }
