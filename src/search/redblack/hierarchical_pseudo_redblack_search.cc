@@ -222,7 +222,7 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 					auto goal_facts = std::vector<FactPair>();
 					goal_facts.reserve(g_goal.size());
 					std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
-					auto red_plan = get_red_plan(current_best_supporters, current_global_state, goal_facts);
+					auto red_plan = get_red_plan(current_best_supporters, current_global_state, goal_facts, true);
 					if (plan_repair_heuristic && !check_plan(current_global_state, red_plan, goal_facts))
 						red_plan = get_repaired_plan(current_global_state, red_plan, goal_facts);
 					auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, goal_facts);
@@ -276,7 +276,7 @@ void HierarchicalPseudoRedBlackSearch::generate_successors() {
 		verify_black_variable_values(current_state, current_global_state);
 		assert(global_search_space.get_node(current_global_state).is_closed());
 
-		auto red_plan = get_red_plan(current_best_supporters, current_global_state, precondition_facts);
+		auto red_plan = get_red_plan(current_best_supporters, current_global_state, precondition_facts, true);
 		if (plan_repair_heuristic && !check_plan(current_global_state, red_plan, precondition_facts))
 			red_plan = get_repaired_plan(current_global_state, red_plan, precondition_facts);
 		auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, precondition_facts);
