@@ -81,6 +81,15 @@ auto LeastConflictsPaintingStrategy::generate_next_painting(const Painting &last
 		if (current_state[goal_fact.var] != goal_fact.value)
 			++conflicts[goal_fact.var];
 
+#ifndef NDEBUG
+	for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
+		// black variables should not have a conflict
+		assert(last_painting.is_red_var(var) || conflicts[var] == 0);
+		// and neither should causal graph leaves
+		assert(!causal_graph::get_causal_graph(g_root_task().get()).get_successors(var).empty() || conflicts[var] == 0);
+	}
+#endif
+
 	std::vector<int> level;
 	auto max_level = -1;
 	if (prefer_lvl) {
