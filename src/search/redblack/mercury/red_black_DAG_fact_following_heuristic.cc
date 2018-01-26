@@ -1671,7 +1671,10 @@ int RedBlackDAGFactFollowingHeuristic::resolve_conflicts_DAG() {
 			int prv = get_black_prv(op_no, var);
 			if (prv != -1 && prv != val) {
 				// Need to support the next action
+				const auto previous_size = curr_sequence.size();
 				add_path_for_var_from_to(var, val, prv, curr_sequence);
+				if (curr_sequence.size() == previous_size)
+					return DEAD_END;
 			    val = prv;
 			}
 			curr_sequence.push_back(op_no);
