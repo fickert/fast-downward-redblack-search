@@ -22,8 +22,10 @@ void RedBlackOperator::reset() {
 	const GlobalOperator *op = &g_operators[op_no];
 	for (const auto &precondition : op->get_preconditions())
 		red_precondition.insert({ precondition.var, precondition.val });
+	black_precondition.clear();
 	for (const auto &effect : op->get_effects())
 		red_effect.insert({ effect.var, effect.val });
+	black_effect.clear();
 }
 
 void RedBlackOperator::set_black_pre_eff(const vector<bool>& black_vars) {
