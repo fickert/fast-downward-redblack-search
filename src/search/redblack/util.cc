@@ -144,7 +144,7 @@ auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, c
 		open = std::move(next_open);
 	}
 	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
-	return ordered ? get_ordered_relaxed_plan(state, relaxed_plan) : relaxed_plan;
+	return ordered && relaxed_plan.size() > 1 ? get_ordered_relaxed_plan(state, relaxed_plan) : relaxed_plan;
 }
 
 auto get_ordered_relaxed_plan(const std::vector<boost::dynamic_bitset<>> &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID> {
