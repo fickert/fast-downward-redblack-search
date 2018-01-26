@@ -278,21 +278,17 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
 			if (!plan_repair_heuristic->is_black(var))
 				continue;
-			auto predecessors = causal_graph::get_causal_graph(g_root_task().get()).get_predecessors(var);
-			assert(std::is_sorted(std::begin(predecessors), std::end(predecessors)));
-			auto successors = causal_graph::get_causal_graph(g_root_task().get()).get_successors(var);
-			assert(std::is_sorted(std::begin(successors), std::end(successors)));
-			auto both = std::vector<int>();
-			std::set_intersection(std::begin(predecessors), std::end(predecessors),
-				std::begin(successors), std::end(successors), std::back_inserter(both));
-			if (std::any_of(std::begin(both), std::end(both), [this](const auto var) { return rb_data->painting.is_black_var(var); })) {
+			const auto &predecessors = causal_graph::get_causal_graph(g_root_task().get()).get_predecessors(var);
+			if (std::any_of(std::begin(predecessors), std::end(predecessors), [this](const auto predecessor_var) {
+				return rb_data->painting.is_black_var(predecessor_var);
+			})) {
 				never_black_variables[var] = false;
 				to_be_painted_red.push_back(var);
 			}
 		}
 		std::sort(std::begin(to_be_painted_red), std::end(to_be_painted_red));
 		to_be_painted_red.erase(std::unique(std::begin(to_be_painted_red), std::end(to_be_painted_red)), std::end(to_be_painted_red));
-		std::cout << "painting " << to_be_painted_red.size() << " variables red (previously " << plan_repair_heuristic->get_num_black() << " black" << std::endl;
+		std::cout << "painting " << to_be_painted_red.size() << " variables red (previously " << plan_repair_heuristic->get_num_black() << " black)" << std::endl;
 		if (plan_repair_heuristic->get_num_black() == static_cast<int>(to_be_painted_red.size())) {
 			// would paint all remaining variables red ==> delete the plan repair heuristic
 			plan_repair_heuristic.reset();
