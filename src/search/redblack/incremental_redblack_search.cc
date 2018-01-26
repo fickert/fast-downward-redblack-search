@@ -300,6 +300,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 			std::transform(rb_plan_it, std::end(plan), std::back_inserter(repaired_plan), [](const auto rb_op) { return rb_op->get_id(); });
 			return repaired_plan;
 		}
+		assert(!to_be_painted_red.empty());
 		plan_repair_heuristic->make_red(to_be_painted_red);
 		return relaxed_repair_plan(plan, marked_facts);
 	};
@@ -500,7 +501,7 @@ SearchStatus IncrementalRedBlackSearch::step() {
 		std::transform(std::begin(rb_plan), std::end(rb_plan), std::back_inserter(plan),
 			[](const auto rb_operator) { return OperatorID(get_op_index_hacked(rb_operator)); });
 	}
-	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan, &never_black_variables));
+	rb_data = std::make_unique<RBData>(incremental_painting_strategy->generate_next_painting(rb_data->painting, plan, current_initial_state, &never_black_variables));
 	auto num_black = std::count_if(std::begin(rb_data->painting.get_painting()), std::end(rb_data->painting.get_painting()),
 		[](auto b) { return !b; });
 	std::cout << "Red-black plan is not a real plan. Search continues with a new painting, "

@@ -242,7 +242,7 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 						return SOLVED;
 					}
 					// the goal is not reachable with a real plan, start a new search with a different painting from here and insert a corresponding node into the open list
-					auto new_painting = incremental_painting_strategy->generate_next_painting(current_state.get_painting(), red_plan, &never_black_variables);
+					auto new_painting = incremental_painting_strategy->generate_next_painting(current_state.get_painting(), red_plan, current_global_state, &never_black_variables);
 					auto new_eval_context = EvaluationContext<RBState, RBOperator>(get_hacked_cache_for_key(current_key), current_g, is_current_preferred, nullptr);
 					enqueue_new_search(new_painting, current_global_state, current_key, is_current_preferred, new_eval_context);
 				}
@@ -314,7 +314,7 @@ void HierarchicalPseudoRedBlackSearch::generate_successors() {
 			}
 		} else {
 			// black operator is not reachable with a real plan, start a new search with a different painting from here and insert a corresponding node into the open list
-			auto new_painting = incremental_painting_strategy->generate_next_painting(current_state.get_painting(), red_plan, &never_black_variables);
+			auto new_painting = incremental_painting_strategy->generate_next_painting(current_state.get_painting(), red_plan, current_global_state, &never_black_variables);
 			auto new_eval_context = EvaluationContext<RBState, RBOperator>(current_eval_context.get_cache(), current_g, is_preferred, nullptr);
 			enqueue_new_search(new_painting, current_global_state, current_eval_context.get_heuristic_value(heuristics.front()), is_preferred, new_eval_context);
 		}
