@@ -273,7 +273,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 	auto deferred_goal_facts = std::vector<FactPair>();
 	auto [current_saturated_state, current_supporters] = static_cast<RBStateRegistry *>(&rb_search_engine->get_state_registry())->get_state_and_best_supporters(current_redblack_state);
 
-	auto retry_with_more_mercury_red = [this, &repaired_plan, &current_partial_plan, &plan, &marked_facts](auto rb_plan_it) {
+	auto retry_with_more_mercury_red = [this, &repaired_plan, &current_partial_plan, &plan, &marked_facts]() {
 		auto to_be_painted_red = std::vector<int>();
 		for (auto var = 0; var < g_root_task()->get_num_variables(); ++var) {
 			if (!plan_repair_heuristic->is_black(var))
@@ -292,8 +292,9 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		if (plan_repair_heuristic->get_num_black() == static_cast<int>(to_be_painted_red.size())) {
 			// would paint all remaining variables red ==> delete the plan repair heuristic
 			plan_repair_heuristic.reset();
-			repaired_plan.insert(std::end(repaired_plan), std::begin(current_partial_plan), std::end(current_partial_plan));
-			std::transform(rb_plan_it, std::end(plan), std::back_inserter(repaired_plan), [](const auto rb_op) { return rb_op->get_id(); });
+			// can't repair plan anymore ==> just return the original red-black plan
+			repaired_plan.clear();
+			std::transform(std::begin(plan), std::end(plan), std::back_inserter(repaired_plan), [](const auto rb_op) { return rb_op->get_id(); });
 			return repaired_plan;
 		}
 		assert(!to_be_painted_red.empty());
@@ -301,8 +302,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		return relaxed_repair_plan(plan, marked_facts);
 	};
 
-	for (auto rb_plan_it = std::begin(plan); rb_plan_it != std::end(plan); ++rb_plan_it) {
-		const auto rb_op = *rb_plan_it;
+	for (const auto rb_op : plan) {
 		assert(current_marked_facts_it != std::end(marked_facts));
 		const auto op_index = get_op_index_hacked(rb_op);
 		if (current_red_actions[op_index]) {
@@ -339,7 +339,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		const auto size = current_goal_facts.size();
 		for (const auto &precondition : rb_op->get_red_preconditions()) {
 			if (!current_saturated_state.has_fact(precondition->var, precondition->val))
-				return retry_with_more_mercury_red(rb_plan_it);
+				return retry_with_more_mercury_red();
 			// NOTE: in theory, we only need to insert the mercury-black preconditions, because the red preconditions should already be achieved by the red plan,
 			// (or in any previous red plan), and with red-black semantics they can't have been deleted again
 			// however, we don't need to take them out of the set of goal facts (they will be ignored anyway by the plan repair)
@@ -354,7 +354,7 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(get_available_facts(), rb_data->painting.get_painting(), current_goal_facts, current_partial_plan, current_red_actions);
 		if (!repaired)
 			// relaxed plan repair failed. paint mercury-black variables red and try again
-			return retry_with_more_mercury_red(rb_plan_it);
+			return retry_with_more_mercury_red();
 		repaired_partial_plan.emplace_back(rb_op->get_id());
 		for (const auto &op_id : repaired_partial_plan) {
 			assert(std::all_of(std::begin(g_operators[op_id.get_index()].get_preconditions()), std::end(g_operators[op_id.get_index()].get_preconditions()),
@@ -381,13 +381,13 @@ auto IncrementalRedBlackSearch::relaxed_repair_plan(const RBPlan &plan, const st
 		return current_saturated_state.has_fact(goal_fact.var, goal_fact.value);
 	}))
 		// the goal is not reachable from this state
-		return retry_with_more_mercury_red(std::end(plan));
+		return retry_with_more_mercury_red();
 	if (always_recompute_red_plans || !is_valid_relaxed_plan(current_redblack_state, goal_facts, current_partial_plan))
 		current_partial_plan = get_red_plan(current_supporters, current_redblack_state, goal_facts, true);
 	assert(is_valid_relaxed_plan(current_redblack_state, goal_facts, current_partial_plan));
 	auto [repaired, repaired_partial_plan] = plan_repair_heuristic->compute_semi_relaxed_plan(get_available_facts(), rb_data->painting.get_painting(), goal_facts, current_partial_plan, current_red_actions);
 	if (!repaired)
-		return retry_with_more_mercury_red(std::end(plan));
+		return retry_with_more_mercury_red();
 	repaired_plan.insert(std::end(repaired_plan), std::begin(repaired_partial_plan), std::end(repaired_partial_plan));
 	return repaired_plan;
 }
