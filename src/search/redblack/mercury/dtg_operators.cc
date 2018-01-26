@@ -35,6 +35,7 @@ DtgOperators::DtgOperators(int v) : var(v), is_root(false),
 	}
 	clear_all_marks();
 	dijkstra_distance = 0;
+	dijkstra_tiebreaker = 0;
 	dijkstra_ops = 0;
 	dijkstra_prev = 0;
 
@@ -57,6 +58,7 @@ void DtgOperators::initialize_black(RedBlackDAGFactFollowingHeuristic* base) {
 
 	// Allocating the memory for Dijkstra calculation
 	dijkstra_distance = new int[range];
+	dijkstra_tiebreaker = new int[range];
 	dijkstra_ops = new int[range];
 	dijkstra_prev = new int[range];
 	std::fill_n(dijkstra_ops, range, -1);
@@ -249,6 +251,10 @@ void DtgOperators::clear_black_data_for_red_var() {
 	if (dijkstra_distance) {
 		delete dijkstra_distance;
 		dijkstra_distance = 0;
+	}
+	if (dijkstra_tiebreaker) {
+		delete dijkstra_tiebreaker;
+		dijkstra_tiebreaker = 0;
 	}
 	if (dijkstra_ops) {
 		delete dijkstra_ops;
@@ -761,8 +767,10 @@ const vector<int>& DtgOperators::calculate_shortest_path_from_to(int from, int t
 #endif
 
 	std::fill_n(dijkstra_distance, range, numeric_limits<int>::max());
+	std::fill_n(dijkstra_tiebreaker, range, numeric_limits<int>::max());
 	priority_queues::AdaptiveQueue<int> queue;
     dijkstra_distance[from] = 0;
+	dijkstra_tiebreaker[from] = 0;
 	dijkstra_ops[from] = -1;
 	dijkstra_prev[from] = -1;
 
@@ -792,9 +800,11 @@ const vector<int> & DtgOperators::calculate_shortest_path_from_to(
 #endif
 
 	std::fill_n(dijkstra_distance, range, numeric_limits<int>::max());
+	std::fill_n(dijkstra_tiebreaker, range, numeric_limits<int>::max());
 	priority_queues::AdaptiveQueue<int> queue;
 	for (const auto from_val : from) {
 		dijkstra_distance[from_val] = 0;
+		dijkstra_tiebreaker[from_val] = 0;
 		dijkstra_ops[from_val] = -1;
 		dijkstra_prev[from_val] = -1;
 		queue.push(solution[from_val][to], from_val);
@@ -863,7 +873,8 @@ void DtgOperators::astar_search(priority_queues::AdaptiveQueue<int> &queue, int 
 
         for (int i = 0; i < complete_forward_graph[state].size(); i++) {
         	const GraphEdge& transition = complete_forward_graph[state][i];
-        	if (!is_transition_enabled(transition, state)) {
+			auto transition_status = is_transition_enabled(transition, state);
+        	if (transition_status == TransitionStatus::DISABLED) {
 #ifdef DEBUG_RED_BLACK
         		cout << "[NOT ENABLED!]: ";
         		g_operators[transition.op_no].dump(true);
@@ -878,8 +889,10 @@ void DtgOperators::astar_search(priority_queues::AdaptiveQueue<int> &queue, int 
 
             int successor = transition.to;
             int successor_g = g_val + transition.cost;
-            if (dijkstra_distance[successor] > successor_g) {
+			auto tie_break_value = transition_status == TransitionStatus::ENABLED_BLACK_APPLICABLE ? 0 : 1;
+            if (dijkstra_distance[successor] > successor_g || (dijkstra_distance[successor] == successor_g && tie_break_value < dijkstra_tiebreaker[successor])) {
             	dijkstra_distance[successor] = successor_g;
+				dijkstra_tiebreaker[successor] = tie_break_value;
             	dijkstra_ops[successor] = transition.op_no;
             	dijkstra_prev[successor] = state;
                 queue.push(successor_g + solution[successor][goal], successor);
@@ -891,7 +904,7 @@ void DtgOperators::astar_search(priority_queues::AdaptiveQueue<int> &queue, int 
 #endif
 }
 
-bool DtgOperators::is_transition_enabled(const GraphEdge& trans, int from) const {
+DtgOperators::TransitionStatus DtgOperators::is_transition_enabled(const GraphEdge& trans, int from) const {
 	if (only_current_transitions) {
 		vector<int> path;
 		// Getting the current path to "from"
@@ -899,14 +912,15 @@ bool DtgOperators::is_transition_enabled(const GraphEdge& trans, int from) const
 		// adding the current transition to the end of the path
 		path.push_back(trans.op_no);
 
-		if (is_red_connected) {
-			// Checking whether the whole path is applicable (the first part must be)
-			return base_pointer->is_currently_applicable(path);
-		}
-		// Skipping black variables for applicability check
-		return base_pointer->is_currently_applicable(path, true);
+		if (base_pointer->is_currently_applicable(path))
+			// Checking whether the whole path is applicable (the first part must be if red connected)
+			return TransitionStatus::ENABLED_BLACK_APPLICABLE;
+		if (!is_red_connected && base_pointer->is_currently_applicable(path, true))
+			// Skipping black variables for applicability check
+			return TransitionStatus::ENABLED;
+		return TransitionStatus::DISABLED;
 	}
-	return trans.initially_enabled || base_pointer->op_is_enabled(trans.op_no);
+	return (trans.initially_enabled || base_pointer->op_is_enabled(trans.op_no)) ? TransitionStatus::ENABLED : TransitionStatus::DISABLED;
 }
 
 #ifdef __GNUC__

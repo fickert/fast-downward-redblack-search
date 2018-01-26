@@ -71,6 +71,7 @@ class DtgOperators {
 	int current_value;
 	int missing_value;
 	int* dijkstra_distance; // Deleted for red variables after initialization
+	int* dijkstra_tiebreaker; // Deleted for red variables after initialization
 	int* dijkstra_ops; // Deleted for red variables after initialization
 	int* dijkstra_prev; // Deleted for red variables after initialization
 
@@ -100,7 +101,13 @@ class DtgOperators {
 
 	void set_root() { is_root = true; }
 
-	bool is_transition_enabled(const GraphEdge& trans, int from) const;
+	enum class TransitionStatus {
+		DISABLED,
+		ENABLED,
+		ENABLED_BLACK_APPLICABLE,
+	};
+
+	TransitionStatus is_transition_enabled(const GraphEdge& trans, int from) const;
 
 	// For delaying the goal achievement
 	bool check_connected_from_to(int from, int to);
