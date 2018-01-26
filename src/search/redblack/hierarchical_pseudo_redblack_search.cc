@@ -31,6 +31,7 @@ HierarchicalPseudoRedBlackSearch::HierarchicalPseudoRedBlackSearch(const options
                                                        std::shared_ptr<RedActionsManager> red_actions_manager,
                                                        const std::vector<bool> &never_black_variables,
                                                        HierarchicalPseudoRedBlackSearchStatistics &hierarchical_red_black_search_statistics,
+                                                       SearchStatistics &global_search_statistics,
                                                        int num_black,
                                                        bool initial_state_is_preferred,
                                                        int initial_state_h_value)
@@ -55,7 +56,8 @@ HierarchicalPseudoRedBlackSearch::HierarchicalPseudoRedBlackSearch(const options
 	  rb_search_spaces(rb_search_spaces),
 	  num_black(num_black),
 	  force_completeness(opts.get<bool>("force_completeness")),
-	  hierarchical_red_black_search_statistics(hierarchical_red_black_search_statistics) {
+	  hierarchical_red_black_search_statistics(hierarchical_red_black_search_statistics),
+	  global_search_statistics(global_search_statistics) {
 	auto pref_operator_heuristics = search_options.get_list<Heuristic<RBState, RBOperator> *>("preferred");
 	set_pref_operator_heuristics(pref_operator_heuristics);
 	LazySearch<RBState, RBOperator>::initialize();
@@ -109,7 +111,7 @@ void HierarchicalPseudoRedBlackSearch::enqueue_new_search(const Painting &painti
 		search_options, std::get<1>(rb_search_space_it->second), std::get<3>(rb_search_space_it->second),
 		initial_state, global_state_registry, global_search_space, rb_search_spaces, plan_repair_heuristic,
 		std::get<std::shared_ptr<RedActionsManager>>(rb_search_space_it->second),
-		never_black_variables, hierarchical_red_black_search_statistics, num_black, preferred, key));
+		never_black_variables, hierarchical_red_black_search_statistics, global_search_statistics, num_black, preferred, key));
 	if (!painting_is_new) {
 		// state registry initial state doesn't match the actual initial state that should be used in the search
 		auto &child_search = *child_searches.at(current_state.get_id()).back();
@@ -199,13 +201,16 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 						parent_state, *current_operator, current_state);
 			}
 			statistics.inc_evaluated_states();
+			global_search_statistics.inc_evaluated_states();
 			++hierarchical_red_black_search_statistics.total_num_evaluations;
 			assert(current_state.get_id() == current_eval_context.get_state().get_id());
 			if (!open_list->is_dead_end(current_eval_context)) {
 				// TODO: Generalize code for using multiple heuristics.
+				global_search_statistics.inc_evaluations();
 				if (reopen) {
 					node.reopen(parent_node, current_operator);
 					statistics.inc_reopened();
+					global_search_statistics.inc_reopened();
 				} else if (current_predecessor_id == StateID::no_state) {
 					node.open_initial();
 					if (search_progress.check_progress(current_eval_context))
@@ -247,9 +252,11 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 				}
 				generate_successors();
 				statistics.inc_expanded();
+				global_search_statistics.inc_expanded();
 			} else {
 				node.mark_as_dead_end();
 				statistics.inc_dead_ends();
+				global_search_statistics.inc_dead_ends();
 			}
 			if (current_predecessor_id == StateID::no_state) {
 				print_initial_h_values(current_eval_context);
@@ -285,6 +292,7 @@ void HierarchicalPseudoRedBlackSearch::generate_successors() {
 		if (is_plan) {
 			// black operator preconditions are reachable with a real plan, insert search node as usual
 			statistics.inc_generated();
+			global_search_statistics.inc_generated();
 			int new_g = current_g + get_adjusted_cost(*op);
 			int new_real_g = current_real_g + op->get_cost();
 			if (new_real_g < bound) {
@@ -504,7 +512,7 @@ HierarchicalPseudoRedBlackSearchWrapper::HierarchicalPseudoRedBlackSearchWrapper
 	root_search_engine = std::make_unique<HierarchicalPseudoRedBlackSearch>(
 		rb_search_options, root_state_registry, root_search_space, state_registry->get_initial_state(),
 		*state_registry, *search_space, rb_search_spaces, plan_repair_heuristic, root_red_actions_manager,
-		never_black_variables, hierarchical_red_black_search_statistics, num_black);
+		never_black_variables, hierarchical_red_black_search_statistics, statistics, num_black);
 	++hierarchical_red_black_search_statistics.num_openend_searches;
 	++hierarchical_red_black_search_statistics.num_distinct_paintings;
 	auto initial_node = search_space->get_node(state_registry->get_initial_state());

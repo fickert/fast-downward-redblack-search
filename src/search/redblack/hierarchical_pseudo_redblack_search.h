@@ -52,6 +52,7 @@ public:
 	                           std::shared_ptr<RedActionsManager> red_actions_manager,
 	                           const std::vector<bool> &never_black_variables,
 	                           HierarchicalPseudoRedBlackSearchStatistics &hierarchical_red_black_search_statistics,
+	                           SearchStatistics &global_search_statistics,
 	                           int num_black,
 	                           bool initial_state_is_preferred = true,
 	                           int initial_state_h_value = 0);
@@ -105,6 +106,7 @@ protected:
 	const bool force_completeness;
 
 	HierarchicalPseudoRedBlackSearchStatistics &hierarchical_red_black_search_statistics;
+	SearchStatistics &global_search_statistics;
 };
 
 
