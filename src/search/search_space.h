@@ -194,6 +194,12 @@ public:
     virtual void trace_path(const StateType &goal_state,
                             std::vector<const OperatorType *> &path) const;
 
+	// TODO: move this to a separate RBSearchSpace class
+	// returns the remaining marked facts and the path to a red-black state as
+	// vector of <outgoing state, red prefix in that state, black action> tuples
+	virtual auto trace_rb_path(const StateType &state, const std::vector<FactPair> &additional_goal_facts) const
+		-> std::pair<std::set<FactPair>, std::vector<std::tuple<StateID, std::vector<OperatorID>, OperatorID>>>;
+
     void dump() const;
     void print_statistics() const;
 };
@@ -237,5 +243,9 @@ void SearchSpace<StateType, OperatorType, StateRegistryType>::print_statistics()
 template<>
 void SearchSpace<GlobalState, GlobalOperator>::trace_path(const GlobalState &goal_state,
 	std::vector<const GlobalOperator *> &path) const;
+
+template<>
+auto SearchSpace<GlobalState, GlobalOperator>::trace_rb_path(const GlobalState &state, const std::vector<FactPair> &additional_goal_facts) const
+	-> std::pair<std::set<FactPair>, std::vector<std::tuple<StateID, std::vector<OperatorID>, OperatorID>>>;
 
 #endif

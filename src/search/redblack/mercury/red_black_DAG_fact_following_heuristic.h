@@ -228,7 +228,7 @@ private:
 	void free_mem();
 	void prepare_operators_for_counting_achieved_preconditions();
 	void reset_all_marks(const std::vector<FactPair> &goal_facts);
-	void set_new_marks_for_state(const GlobalState &state);
+	void set_new_marks_for_state(const std::vector<int> &state_values);
 	void set_new_marks_for_state(const std::vector<FactPair> &facts);
 	bool is_semi_relaxed_goal_reached(const std::vector<FactPair> &goal);
 	int resolve_conflicts();
@@ -272,6 +272,7 @@ public:
 	auto get_black_indices() const -> const std::vector<int> & { return black_indices; }
 
 	auto compute_semi_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
+	auto compute_semi_relaxed_plan(const std::vector<int> &state_values, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
 	auto compute_semi_relaxed_plan(const std::vector<FactPair> &available_facts, const std::vector<bool> &outside_red_variables, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>>;
 
 	auto is_black(int var) const -> bool { return black_vars[var]; }

@@ -1131,22 +1131,22 @@ void RedBlackDAGFactFollowingHeuristic::reset_all_marks(const std::vector<FactPa
 }
 
 
-void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const GlobalState &state) {
+void RedBlackDAGFactFollowingHeuristic::set_new_marks_for_state(const std::vector<int> &state_values) {
 	// Marking achieved by the state vals
 	for (int v=0; v < g_variable_domain.size(); v++) {
-		get_dtg(v)->mark_achieved_val(state[v], black_vars[v]);
+		get_dtg(v)->mark_achieved_val(state_values[v], black_vars[v]);
 	}
 
 	// red preconditions are marked
 	for (int ind = 0; ind < red_indices.size(); ind++) {
 		int var = red_indices[ind];
-		mark_red_precondition(var, state[var]);
+		mark_red_precondition(var, state_values[var]);
 	}
 
 	// black state vals are marked as reachable
 	for (int ind = 0; ind < black_indices.size(); ind++) {
 		int var = black_indices[ind];
-		get_dtg(var)->mark_as_reachable(state[var]);
+		get_dtg(var)->mark_as_reachable(state_values[var]);
 	}
 
 	// TODO: very strange...
@@ -1926,7 +1926,11 @@ void RedBlackDAGFactFollowingHeuristic::remove_all_operators_from_parallel_relax
 }
 
 auto RedBlackDAGFactFollowingHeuristic::compute_semi_relaxed_plan(const GlobalState &state, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>> {
-	if (std::all_of(std::begin(goal_facts), std::end(goal_facts), [&state](const auto &goal) { return state[goal.var] == goal.value; }))
+	return compute_semi_relaxed_plan(state.get_values(), goal_facts, base_relaxed_plan, legal_operators);
+}
+
+auto RedBlackDAGFactFollowingHeuristic::compute_semi_relaxed_plan(const std::vector<int> &state_values, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &base_relaxed_plan, const boost::dynamic_bitset<> &legal_operators) -> std::pair<bool, std::vector<OperatorID>> {
+	if (std::all_of(std::begin(goal_facts), std::end(goal_facts), [&state_values](const auto &goal) { return state_values[goal.var] == goal.value; }))
 		return {true, {}};
 	assert(black_indices.size() > 0);
 	assert(extract_plan);
@@ -1944,12 +1948,12 @@ auto RedBlackDAGFactFollowingHeuristic::compute_semi_relaxed_plan(const GlobalSt
 		solution_found = false;
 
 		for (int i = 0; i < g_variable_domain.size(); i++)
-			curr_state_buffer[i] = {state[i]};
+			curr_state_buffer[i] = { state_values[i]};
 	}
 
 	reset_all_marks(goal_facts);
 	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
-	set_new_marks_for_state(state);
+	set_new_marks_for_state(state_values);
 
 	int res = get_semi_relaxed_plan_cost(goal_facts);
 
@@ -2080,7 +2084,7 @@ int RedBlackDAGFactFollowingHeuristic::compute_heuristic(const GlobalState &stat
 
 	reset_all_marks(goal_facts);
 	// timer g_rb_timer_semi_relaxed_marks is stopped in this function
-	set_new_marks_for_state(state);
+	set_new_marks_for_state(state.get_values());
 
     int res = get_semi_relaxed_plan_cost(goal_facts);
 

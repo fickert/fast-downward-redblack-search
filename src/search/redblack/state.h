@@ -46,6 +46,7 @@ public:
 	}
 
 	std::vector<int> get_values() const override;
+	auto get_redblack_values() const -> std::vector<boost::dynamic_bitset<>>;
 
 	void dump_pddl() const override;
 	void dump_fdr() const override;

@@ -53,10 +53,14 @@ RedActionsManager::RedActionsManager(const std::vector<RBOperator> &operators)
 }
 
 auto RedActionsManager::get_red_actions_for_state(const GlobalState &state) -> boost::dynamic_bitset<> {
+	return get_red_actions_for_state(state.get_values());
+}
+
+auto RedActionsManager::get_red_actions_for_state(const std::vector<int> &state_values) -> boost::dynamic_bitset<> {
 	auto result = red_operators;
 	for (const auto &conditionally_red_operator : conditionally_red_operators) {
 		assert(conditionally_red_operator.second.any());
-		if (std::all_of(std::begin(conditionally_red_operator.first), std::end(conditionally_red_operator.first), [&state](const auto &precondition) { return state[precondition.var] == precondition.value; }))
+		if (std::all_of(std::begin(conditionally_red_operator.first), std::end(conditionally_red_operator.first), [&state_values](const auto &precondition) { return state_values[precondition.var] == precondition.value; }))
 			result |= conditionally_red_operator.second;
 	}
 	return result;

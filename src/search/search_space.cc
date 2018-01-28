@@ -19,3 +19,10 @@ void SearchSpace<GlobalState, GlobalOperator>::trace_path(const GlobalState &goa
     }
     reverse(path.begin(), path.end());
 }
+
+template<>
+auto SearchSpace<GlobalState, GlobalOperator>::trace_rb_path(const GlobalState &, const std::vector<FactPair> &) const -> std::pair<std::set<FactPair>, std::vector<std::tuple<StateID, std::vector<OperatorID>, OperatorID>>> {
+	std::cerr << "The trace_rb_path function may only be used in red-black search" << std::endl;
+	utils::exit_with(utils::ExitCode::CRITICAL_ERROR);
+}
+

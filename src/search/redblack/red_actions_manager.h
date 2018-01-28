@@ -17,8 +17,8 @@ public:
 	RedActionsManager(const std::vector<RBOperator> &operators);
 
 	auto get_red_actions_for_state(const GlobalState &state) -> boost::dynamic_bitset<>;
-	auto get_red_actions_for_state(
-		const std::vector<boost::dynamic_bitset<>> &state) -> boost::dynamic_bitset<>;
+	auto get_red_actions_for_state(const std::vector<int> &state_values) -> boost::dynamic_bitset<>;
+	auto get_red_actions_for_state(const std::vector<boost::dynamic_bitset<>> &state) -> boost::dynamic_bitset<>;
 };
 }
 
