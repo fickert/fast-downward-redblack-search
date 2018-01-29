@@ -46,7 +46,7 @@ HierarchicalPseudoRedBlackSearch::HierarchicalPseudoRedBlackSearch(const options
 	  current_child_search_index(-1),
 	  current_best_supporters(static_cast<RBStateRegistry *>(this->state_registry.get())->get_initial_state_best_supporters()),
 	  corresponding_global_state(),
-	  pending_corresponding_global_states(),
+	  current_global_state(current_initial_state),
 	  global_goal_state(StateID::no_state),
 	  search_options(opts),
 	  incremental_painting_strategy(opts.get<std::shared_ptr<IncrementalPaintingStrategy>>("incremental_painting_strategy")),
@@ -62,13 +62,13 @@ HierarchicalPseudoRedBlackSearch::HierarchicalPseudoRedBlackSearch(const options
 	set_pref_operator_heuristics(pref_operator_heuristics);
 	LazySearch<RBState, RBOperator>::initialize();
 	corresponding_global_state.insert({current_state.get_id(), current_initial_state.get_id()});
-	// auto num_black = std::count_if(
+	// auto _num_black = std::count_if(
 	// 	std::begin(static_cast<RBStateRegistry *>(this->state_registry.get())->get_painting().get_painting()),
 	// 	std::end(static_cast<RBStateRegistry *>(this->state_registry.get())->get_painting().get_painting()),
 	// 	[](auto b) { return !b; });
 	// std::cout << "Starting red-black search with a painting with "
-	// 	<< num_black << " black variables ("
-	// 	<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)..." << std::endl;
+	// 	<< _num_black << " black variables ("
+	// 	<< (_num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)..." << std::endl;
 	// std::cout << "Painting " << static_cast<RBStateRegistry *>(this->state_registry.get())->get_painting() << std::endl;
 	// std::cout << "This search is: " << this << std::endl;
 }
@@ -221,7 +221,7 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 				node.close();
 				if (test_goal(current_state)) {
 					assert(corresponding_global_state.find(current_state.get_id()) != std::end(corresponding_global_state));
-					auto current_global_state = global_state_registry.lookup_state(corresponding_global_state.at(current_state.get_id()));
+					assert(corresponding_global_state.at(current_state.get_id()) == current_global_state.get_id());
 					verify_black_variable_values(current_state, current_global_state);
 					assert(global_search_space.get_node(current_global_state).is_closed());
 					auto goal_facts = std::vector<FactPair>();
@@ -266,59 +266,43 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 	return fetch_next_state();
 }
 
-void HierarchicalPseudoRedBlackSearch::generate_successors() {
-	ordered_set::OrderedSet<OperatorID> preferred_operators = collect_preferred_operators(current_eval_context, preferred_operator_heuristics);
-	if (randomize_successors)
-		preferred_operators.shuffle(*rng);
+auto HierarchicalPseudoRedBlackSearch::realizability_check(const RBState &state, const RBOperator &op) -> bool{
+	const auto &preconditions = op.get_base_operator().get_preconditions();
+	auto precondition_facts = std::vector<FactPair>();
+	precondition_facts.reserve(preconditions.size());
+	std::transform(std::begin(preconditions), std::end(preconditions), std::back_inserter(precondition_facts), [](const auto &condition) { return FactPair{ condition.var, condition.val }; });
+	assert(corresponding_global_state.find(state.get_id()) != std::end(corresponding_global_state));
+	auto global_state = global_state_registry.lookup_state(corresponding_global_state.at(state.get_id()));
+	verify_black_variable_values(state, global_state);
+	assert(global_search_space.get_node(global_state).is_closed());
 
-	std::vector<OperatorID> successor_operators = get_successor_operators(preferred_operators);
-	for (OperatorID op_id : successor_operators) {
-		const auto *op = get_operator(op_id.get_index());
-		const auto &preconditions = op->get_base_operator().get_preconditions();
-		auto precondition_facts = std::vector<FactPair>();
-		precondition_facts.reserve(preconditions.size());
-		std::transform(std::begin(preconditions), std::end(preconditions), std::back_inserter(precondition_facts), [](const auto &condition) { return FactPair{condition.var, condition.val}; });
-		assert(corresponding_global_state.find(current_state.get_id()) != std::end(corresponding_global_state));
-		auto current_global_state = global_state_registry.lookup_state(corresponding_global_state.at(current_state.get_id()));
-		verify_black_variable_values(current_state, current_global_state);
-		assert(global_search_space.get_node(current_global_state).is_closed());
+	const auto best_supporters = static_cast<RBStateRegistry *>(state_registry.get())->get_state_and_best_supporters(global_state.get_values()).second;
+	auto red_plan = get_red_plan(best_supporters, global_state, precondition_facts, true);
+	if (plan_repair_heuristic && !check_plan(global_state, red_plan, precondition_facts))
+		red_plan = get_repaired_plan(global_state, red_plan, precondition_facts);
+	auto [is_plan, resulting_state] = update_search_space_and_check_plan(global_state, red_plan, precondition_facts);
 
-		auto red_plan = get_red_plan(current_best_supporters, current_global_state, precondition_facts, true);
-		if (plan_repair_heuristic && !check_plan(current_global_state, red_plan, precondition_facts))
-			red_plan = get_repaired_plan(current_global_state, red_plan, precondition_facts);
-		auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, precondition_facts);
-
-		auto is_preferred = preferred_operators.contains(op_id);
-		if (is_plan) {
-			// black operator preconditions are reachable with a real plan, insert search node as usual
-			statistics.inc_generated();
-			global_search_statistics.inc_generated();
-			int new_g = current_g + get_adjusted_cost(*op);
-			int new_real_g = current_real_g + op->get_cost();
-			if (new_real_g < bound) {
-				EvaluationContext<RBState, RBOperator> new_eval_context(
-					current_eval_context.get_cache(), new_g, is_preferred, nullptr);
-				open_list->insert(new_eval_context, std::make_pair(current_state.get_id(), get_op_index_hacked(op)));
-				auto successor_state = global_state_registry.get_successor_state(resulting_state, op->get_base_operator());
-				auto parent_node = global_search_space.get_node(resulting_state);
-				assert(parent_node.is_closed());
-				auto successor_node = global_search_space.get_node(successor_state);
-				if (successor_node.is_new()) {
-					successor_node.open(parent_node, &op->get_base_operator());
-					successor_node.close();
-				} else if (successor_node.is_closed() && parent_node.get_g() + get_adjusted_action_cost(*op, cost_type) < successor_node.get_g()) {
-					successor_node.reopen(parent_node, &op->get_base_operator());
-					successor_node.close();
-				}
-				pending_corresponding_global_states.insert({{current_state.get_id(), get_op_index_hacked(op)}, successor_state.get_id()});
-			}
-		} else {
-			// black operator is not reachable with a real plan, start a new search with a different painting from here and insert a corresponding node into the open list
-			auto new_painting = incremental_painting_strategy->generate_next_painting(current_state.get_painting(), red_plan, current_global_state, &never_black_variables);
-			auto new_eval_context = EvaluationContext<RBState, RBOperator>(current_eval_context.get_cache(), current_g, is_preferred, nullptr);
-			enqueue_new_search(new_painting, current_global_state, current_eval_context.get_heuristic_value(heuristics.front()), is_preferred, new_eval_context);
-		}
+	if (!is_plan) {
+		// black operator is not reachable with a real plan, start a new search with a different painting from here and insert a corresponding node into the open list
+		const auto new_painting = incremental_painting_strategy->generate_next_painting(state.get_painting(), red_plan, global_state, &never_black_variables);
+		auto new_eval_context = EvaluationContext<RBState, RBOperator>(current_eval_context.get_cache(), current_g, is_current_preferred, nullptr);
+		enqueue_new_search(new_painting, global_state, current_key, is_current_preferred, new_eval_context);
+		return false;
 	}
+
+	current_global_state = global_state_registry.get_successor_state(resulting_state, op.get_base_operator());
+	auto parent_node = global_search_space.get_node(resulting_state);
+	assert(parent_node.is_closed());
+	auto successor_node = global_search_space.get_node(current_global_state);
+	if (successor_node.is_new()) {
+		successor_node.open(parent_node, &op.get_base_operator());
+		successor_node.close();
+	} else if (successor_node.is_closed() && parent_node.get_g() + get_adjusted_action_cost(op, cost_type) < successor_node.get_g()) {
+		successor_node.reopen(parent_node, &op.get_base_operator());
+		successor_node.close();
+	}
+
+	return true;
 }
 
 SearchStatus HierarchicalPseudoRedBlackSearch::fetch_next_state() {
@@ -352,16 +336,13 @@ SearchStatus HierarchicalPseudoRedBlackSearch::fetch_next_state() {
 		current_operator = get_operator(next.second);
 		auto current_predecessor = state_registry->lookup_state(current_predecessor_id);
 		assert(current_operator->is_applicable(current_predecessor));
-		auto corresponding_global_state_it = pending_corresponding_global_states.find({current_predecessor_id, next.second});
-		if (corresponding_global_state_it == std::end(pending_corresponding_global_states))
-			// this open list entry was already handled (this can happen e.g. with the alternating queue, where entries are inserted in two different queues)
+		// TODO: make sure to not do work twice (i.e. for state/op pairs that have already been explored)
+		if (!realizability_check(current_predecessor, *current_operator))
 			return fetch_next_state();
 		std::tie(current_state, current_best_supporters) =
-			static_cast<RBStateRegistry *>(state_registry.get())->get_state_and_best_supporters(
-				global_state_registry.lookup_state(corresponding_global_state_it->second).get_values());
-		corresponding_global_state.insert({current_state.get_id(), corresponding_global_state_it->second});
-		verify_black_variable_values(current_state, global_state_registry.lookup_state(corresponding_global_state_it->second));
-		pending_corresponding_global_states.erase(corresponding_global_state_it);
+			static_cast<RBStateRegistry *>(state_registry.get())->get_state_and_best_supporters(current_global_state.get_values());
+		corresponding_global_state.insert({current_state.get_id(), current_global_state.get_id()});
+		verify_black_variable_values(current_state, current_global_state);
 		auto pred_node = search_space->get_node(current_predecessor);
 		current_g = pred_node.get_g() + get_adjusted_cost(*current_operator);
 		current_real_g = pred_node.get_real_g() + current_operator->get_cost();

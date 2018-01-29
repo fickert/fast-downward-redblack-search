@@ -62,13 +62,13 @@ public:
 	auto get_goal_state() const -> StateID;
 
 protected:
-	void generate_successors() override;
 	SearchStatus fetch_next_state() override;
 
 	static auto check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> bool;
 	auto get_repaired_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) const -> std::vector<OperatorID>;
 	auto update_search_space_and_check_plan(const GlobalState &state, const std::vector<OperatorID> &plan, const std::vector<FactPair> &goal_facts) -> std::pair<bool, GlobalState>;
 
+	auto realizability_check(const RBState &state, const RBOperator &op) -> bool;
 	void enqueue_new_search(const Painting &new_painting, const GlobalState &initial_state, int key, bool preferred, EvaluationContext<RBState, RBOperator> &new_eval_context);
 
 	auto get_hacked_cache_for_key(int key) const -> HeuristicCache<RBState, RBOperator>;
@@ -84,14 +84,13 @@ protected:
 	auto get_current_key() const -> int;
 
 	std::unordered_map<StateID, std::vector<std::unique_ptr<HierarchicalPseudoRedBlackSearch>>> child_searches;
-	//std::unordered_map<StateID, std::vector<std::unique_ptr<RBData>>> child_searches_rb_data;
 	std::unique_ptr<HierarchicalPseudoRedBlackSearch> *current_child_search;
 	int current_child_search_index;
 
 	std::vector<std::vector<OperatorID>> current_best_supporters;
 
 	std::unordered_map<StateID, StateID> corresponding_global_state;
-	std::unordered_map<std::pair<StateID, int>, StateID> pending_corresponding_global_states;
+	GlobalState current_global_state;
 
 	StateID global_goal_state;
 
