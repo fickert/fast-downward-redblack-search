@@ -185,8 +185,6 @@ void debug_verify_relaxed_plan(const GlobalState &, const std::vector<OperatorID
 #endif
 
 
-// lazy means "don't reorder if already in order"
-// short means we're using a set of FactPairs instead of a vector of bitsets, which is intended to be used with shorter plans
 void order_relaxed_plan_lazy_short(const std::vector<int> &state_values, std::vector<OperatorID> &relaxed_plan) {
 	auto current_achieved_facts = std::unordered_set<FactPair>();
 	current_achieved_facts.reserve(g_root_task()->get_num_variables());
@@ -205,6 +203,24 @@ void order_relaxed_plan_lazy_short(const std::vector<int> &state_values, std::ve
 		for (const auto &effect : g_operators[rp_it->get_index()].get_effects())
 			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), check_condition))
 				current_achieved_facts.emplace(effect.var, effect.val);
+	}
+}
+
+void order_relaxed_plan_lazy(const std::vector<boost::dynamic_bitset<>> &state, std::vector<OperatorID> &relaxed_plan) {
+	auto current_achieved_values = state;
+	// check if a condition is satisfied
+	const auto check_condition = [&current_achieved_values](const auto &precondition) {
+		return current_achieved_values[precondition.var][precondition.val];
+	};
+	for (auto rp_it = std::begin(relaxed_plan); rp_it != std::end(relaxed_plan); ++rp_it) {
+		// swap this operator with the first one that is applicable (does nothing if the current one is applicable)
+		std::iter_swap(rp_it, std::find_if(rp_it, std::end(relaxed_plan), [check_condition](const auto &op_id) {
+			const auto &op = g_operators[op_id.get_index()];
+			return std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), check_condition);
+		}));
+		for (const auto &effect : g_operators[rp_it->get_index()].get_effects())
+			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), check_condition))
+				current_achieved_values[effect.var][effect.val] = true;
 	}
 }
 
@@ -274,7 +290,9 @@ auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, c
 		open = std::move(next_open);
 	}
 	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
-	return ordered && relaxed_plan.size() > 1 ? get_ordered_relaxed_plan(state_values, relaxed_plan) : relaxed_plan;
+	if (ordered && relaxed_plan.size() > 1)
+		order_relaxed_plan_lazy_short(state_values, relaxed_plan);
+	return relaxed_plan;
 }
 
 auto get_ordered_relaxed_plan(const std::vector<boost::dynamic_bitset<>> &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID> {
@@ -329,7 +347,9 @@ auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, c
 		open = std::move(next_open);
 	}
 	std::reverse(std::begin(relaxed_plan), std::end(relaxed_plan));
-	return ordered ? get_ordered_relaxed_plan(state, relaxed_plan) : relaxed_plan;
+	if (ordered && relaxed_plan.size() > 1)
+		order_relaxed_plan_lazy(state, relaxed_plan);
+	return relaxed_plan;
 }
 
 auto get_conflicting_variables(const RedBlackDAGFactFollowingHeuristic &plan_repair_heuristic, const Painting &painting) -> std::vector<int> {
