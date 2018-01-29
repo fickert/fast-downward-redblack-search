@@ -259,9 +259,9 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 				statistics.inc_dead_ends();
 				global_search_statistics.inc_dead_ends();
 			}
-			if (current_predecessor_id == StateID::no_state) {
-				print_initial_h_values(current_eval_context);
-			}
+			//if (current_predecessor_id == StateID::no_state) {
+			//	print_initial_h_values(current_eval_context);
+			//}
 		}
 	}
 	return fetch_next_state();
