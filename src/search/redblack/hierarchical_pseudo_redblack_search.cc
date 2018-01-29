@@ -228,6 +228,7 @@ SearchStatus HierarchicalPseudoRedBlackSearch::step() {
 					goal_facts.reserve(g_goal.size());
 					std::transform(std::begin(g_goal), std::end(g_goal), std::back_inserter(goal_facts), [](const auto &goal) { return FactPair{goal.first, goal.second}; });
 					auto red_plan = get_red_plan(current_best_supporters, current_global_state, goal_facts, false);
+					order_relaxed_plan_lazy_short(current_global_state.get_values(), red_plan);
 					if (plan_repair_heuristic && !check_plan(current_global_state, red_plan, goal_facts))
 						red_plan = get_repaired_plan(current_global_state, red_plan, goal_facts);
 					auto [is_plan, resulting_state] = update_search_space_and_check_plan(current_global_state, red_plan, goal_facts);
@@ -278,6 +279,7 @@ auto HierarchicalPseudoRedBlackSearch::realizability_check(const RBState &state,
 
 	const auto best_supporters = static_cast<RBStateRegistry *>(state_registry.get())->get_state_and_best_supporters(global_state.get_values()).second;
 	auto red_plan = get_red_plan(best_supporters, global_state, precondition_facts, false);
+	order_relaxed_plan_lazy_short(global_state.get_values(), red_plan);
 	if (plan_repair_heuristic && !check_plan(global_state, red_plan, precondition_facts))
 		red_plan = get_repaired_plan(global_state, red_plan, precondition_facts);
 	auto [is_plan, resulting_state] = update_search_space_and_check_plan(global_state, red_plan, precondition_facts);

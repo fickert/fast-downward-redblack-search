@@ -39,10 +39,14 @@ auto is_valid_relaxed_plan(const std::vector<boost::dynamic_bitset<>> &achieved_
 auto is_valid_relaxed_plan(const std::vector<int> &state_values,
                            const std::vector<FactPair> &goal_facts,
                            const std::vector<OperatorID> &relaxed_plan) -> bool;
+auto is_valid_relaxed_plan_short(const std::vector<int> &state_values, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &relaxed_plan) -> bool;
 
 auto get_conflicts(const std::vector<int> &initial_state_values, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &plan) -> std::vector<int>;
 
 void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan, const std::vector<FactPair> &goal_facts);
+
+void order_relaxed_plan_lazy_short(const std::vector<int> &state_values, std::vector<OperatorID> &relaxed_plan);
+
 auto get_ordered_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID>;
 auto get_red_plan(const std::vector<std::vector<OperatorID>> &best_supporters, const GlobalState &state, const std::vector<FactPair> &goal_facts, bool ordered) -> std::vector<OperatorID>;
 auto get_ordered_relaxed_plan(const std::vector<int> &state_values, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID>;

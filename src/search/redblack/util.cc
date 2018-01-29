@@ -104,6 +104,28 @@ auto is_valid_relaxed_plan(const std::vector<int> &state_values,
 	return is_valid_relaxed_plan(achieved_facts, goal_facts, relaxed_plan);
 }
 
+auto is_valid_relaxed_plan_short(const std::vector<int> &state_values, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &relaxed_plan) -> bool {
+	auto current_achieved_facts = std::unordered_set<FactPair>();
+	current_achieved_facts.reserve(g_root_task()->get_num_variables());
+	for (auto var = 0; var < g_root_task()->get_num_variables(); ++var)
+		current_achieved_facts.emplace(var, state_values[var]);
+	for (const auto &op_id : relaxed_plan) {
+		const auto &op = g_operators[op_id.get_index()];
+		if (!std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), [&current_achieved_facts](const auto &precondition) {
+			return current_achieved_facts.find({precondition.var, precondition.val}) != std::end(current_achieved_facts);
+		}))
+			return false;
+		for (const auto &effect : op.get_effects())
+			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), [&current_achieved_facts](const auto &condition) {
+				return current_achieved_facts.find({condition.var, condition.val}) != std::end(current_achieved_facts);
+			}))
+				current_achieved_facts.emplace(effect.var, effect.val);
+	}
+	return std::all_of(std::begin(goal_facts), std::end(goal_facts), [&current_achieved_facts](const auto &goal_fact) {
+		return current_achieved_facts.find({goal_fact.var, goal_fact.value}) != std::end(current_achieved_facts);
+	});
+}
+
 auto get_conflicts(const std::vector<int> &initial_state_values, const std::vector<FactPair> &goal_facts, const std::vector<OperatorID> &plan) -> std::vector<int> {
 	auto conflicts = std::vector<int>(g_root_task()->get_num_variables(), 0);
 	auto current_state = initial_state_values;
@@ -161,6 +183,31 @@ void debug_verify_relaxed_plan(const GlobalState &state, const std::vector<Opera
 #else
 void debug_verify_relaxed_plan(const GlobalState &, const std::vector<OperatorID> &, const std::vector<FactPair> &) {}
 #endif
+
+
+// lazy means "don't reorder if already in order"
+// short means we're using a set of FactPairs instead of a vector of bitsets, which is intended to be used with shorter plans
+void order_relaxed_plan_lazy_short(const std::vector<int> &state_values, std::vector<OperatorID> &relaxed_plan) {
+	auto current_achieved_facts = std::unordered_set<FactPair>();
+	current_achieved_facts.reserve(g_root_task()->get_num_variables());
+	for (auto var = 0; var < g_root_task()->get_num_variables(); ++var)
+		current_achieved_facts.emplace(var, state_values[var]);
+	// check if a condition is satisfied
+	const auto check_condition = [&current_achieved_facts](const auto &precondition) {
+		return current_achieved_facts.find({precondition.var, precondition.val}) != std::end(current_achieved_facts);
+	};
+	for (auto rp_it = std::begin(relaxed_plan); rp_it != std::end(relaxed_plan); ++rp_it) {
+		// swap this operator with the first one that is applicable (does nothing if the current one is applicable)
+		std::iter_swap(rp_it, std::find_if(rp_it, std::end(relaxed_plan), [check_condition](const auto &op_id) {
+			const auto &op = g_operators[op_id.get_index()];
+			return std::all_of(std::begin(op.get_preconditions()), std::end(op.get_preconditions()), check_condition);
+		}));
+		for (const auto &effect : g_operators[rp_it->get_index()].get_effects())
+			if (std::all_of(std::begin(effect.conditions), std::end(effect.conditions), check_condition))
+				current_achieved_facts.emplace(effect.var, effect.val);
+	}
+}
+
 
 auto get_ordered_relaxed_plan(const GlobalState &state, const std::vector<OperatorID> &relaxed_plan) -> std::vector<OperatorID> {
 	return get_ordered_relaxed_plan(state.get_values(), relaxed_plan);
