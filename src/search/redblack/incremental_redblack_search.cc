@@ -44,6 +44,9 @@ IncrementalRedBlackSearch::IncrementalRedBlackSearch(const options::Options &opt
 		[](auto b) { return !b; });
 	std::cout << "Starting incremental red-black search, initial painting has " << num_black << " black variables ("
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
+	if (plan_repair_heuristic)
+		std::cout << "Using mercury for plan repair, initial mercury painting has " << plan_repair_heuristic->get_num_black() << " black variables ("
+			<< (plan_repair_heuristic->get_num_black() / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 	auto initial_node = search_space->get_node(current_initial_state);
 	initial_node.open_initial();
 	initial_node.close();
@@ -533,6 +536,9 @@ void IncrementalRedBlackSearch::print_statistics() const {
 		[](auto b) { return !b; });
 	std::cout << "Final painting has " << num_black << " black variables ("
 		<< (num_black / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
+	if (plan_repair_heuristic)
+		std::cout << "Final mercury painting has " << plan_repair_heuristic->get_num_black() << " black variables ("
+			<< (plan_repair_heuristic->get_num_black() / static_cast<double>(g_root_task()->get_num_variables())) * 100 << "%)" << std::endl;
 	std::cout << "Performed " << incremental_redblack_search_statistics.num_episodes << " episodes of red-black search." << std::endl;
 	std::cout << "Search was restarted " << incremental_redblack_search_statistics.num_restarts << " times after red-black search failed to find a solution." << std::endl;
 	std::cout << "Number of broken red plans: " << incremental_redblack_search_statistics.num_broken_red_plans << std::endl;
